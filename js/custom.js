@@ -374,7 +374,7 @@ function onDeviceMotion(event) {
   if (!g || g.x === null || g.y === null || g.x === undefined) return;
   tilt.motionValid = (tilt.motionValid || 0) + 1;
   tilt.motionAt = performance.now();
-  applyGravity(g.x, g.y);
+  applyGravity(g.x, g.y, 'motion');
 }
 // 予備: 「向きのセンサー」（beta/gamma）から重力の向きを計算する。
 // アプリ内ブラウザなど、動きのセンサーが届かない環境向け（動きのセンサーが来ている間は使わない）
@@ -383,19 +383,23 @@ function onDeviceOrientation(event) {
   tilt.lastBeta = event.beta;
   tilt.lastGamma = event.gamma;
   if (event.beta === null || event.gamma === null || event.beta === undefined) return;
-  if (performance.now() - (tilt.motionAt || -1e9) < 500) return;
+  // 動きのセンサーが一度でも届いたら、以後は向きのセンサーを使わない
+  // （iPhoneは2つのセンサーで重力の符号が逆。混ぜると1回目のレースでハンドルが左右逆になっていた）
+  if (tilt.motionValid) return;
   const b = event.beta * Math.PI / 180, g = event.gamma * Math.PI / 180;
-  applyGravity(-Math.cos(b) * Math.sin(g) * 9.81, Math.sin(b) * 9.81);
+  applyGravity(-Math.cos(b) * Math.sin(g) * 9.81, Math.sin(b) * 9.81, 'orient');
 }
-function applyGravity(gx, gy) {
+function applyGravity(gx, gy, source) {
   tilt.supported = true;
   tilt.lastEvent = performance.now();
   const g = { x: gx, y: gy };
   const magnitude = Math.hypot(g.x, g.y);
   if (magnitude < 2.5) return;   // 端末をほぼ水平に寝かせていると向きが定まらない
   const cx = g.x / magnitude, cy = g.y / magnitude;
-  if (tilt.needsCalibration || !tilt.cal) {
-    tilt.cal = { x: cx, y: cy };   // 今の持ち方をまっすぐ（中心）にする
+  // 今の持ち方をまっすぐ（中心）にする。中心を測ったセンサーと違うセンサーの値が来たら測り直す
+  if (tilt.needsCalibration || !tilt.cal || tilt.calSource !== source) {
+    tilt.cal = { x: cx, y: cy };
+    tilt.calSource = source;
     tilt.needsCalibration = false;
   }
   const cross = tilt.cal.x * cy - tilt.cal.y * cx;
@@ -553,7 +557,7 @@ function toggleFullscreen() {
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
 // ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
-const APP_VERSION = '2026-11-22 v13';
+const APP_VERSION = '2026-11-22 v14';
 let tiltDiagTimer = null;
 function renderTiltDiag() {
   const ua = navigator.userAgent;

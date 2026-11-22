@@ -986,8 +986,13 @@
     const glowScale = parts.booster === 'b_big' ? 1.4 : (parts.booster === 'b_eco' ? 0.8 : 1);
     ship.glows.forEach(glow => { glow.userData.k *= glowScale; });
   }
+  // 機体を片付ける。機体ごとに作ったマテリアル（色・光など）も解放する（共有のものは残す）
   function removeShip(ship) {
     scene.remove(ship.root, ship.shadow);
+    const shared = [darkMat, metalMat, coreMat, flameMat, shadowMat, ghostMat];
+    ship.root.traverse(obj => {
+      if (obj.material && !shared.includes(obj.material)) obj.material.dispose();
+    });
     ship.paint.dispose();
     ship.glass.dispose();
   }

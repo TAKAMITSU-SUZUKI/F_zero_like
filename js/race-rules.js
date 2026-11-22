@@ -433,7 +433,9 @@ function resetRace() {
   updateRaceHud(raceStartedAt);
 }
 function beginRace() {
-  startAudio();
+  // レースごとに音声エンジンを作り直し、前のレースで溜まった処理を捨てる（音飛び・遅れ対策）
+  if (A.context) resetAudioEngine();
+  else startAudio();
   resetRace();
   startCountdown(performance.now());
 }

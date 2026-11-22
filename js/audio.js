@@ -194,8 +194,12 @@ function startAudio() {
         driveSoft: makeDriveCurve(2.2), driveHard: makeDriveCurve(7)
       });
       buildEngine(context);
+      delayL.delayTime.value = delayR.delayTime.value = 0.3;
       applyAudioSettings();
-      setInterval(musicSchedulerTick, 25);
+      // 曲は新しい音声エンジンで最初から鳴らし直す
+      music.name = null;
+      music.nextTime = context.currentTime + 0.1;
+      if (!A.schedulerTimer) A.schedulerTimer = setInterval(musicSchedulerTick, 25);
     } catch (error) {
       A.failed = true;
       console.warn('Web Audio could not be initialized.', error);
@@ -208,6 +212,18 @@ function startAudio() {
       console.warn('Web Audio could not be resumed.', error);
     });
   }
+}
+// 音声エンジンを作り直す（レースごとに呼ぶ）。
+// 長く遊ぶと内部に処理が溜まって音飛び・動作の遅れが出るため、古いエンジンを閉じてまっさらにする。
+// タップした操作の中で呼ぶこと（スマホは操作の中でしか音を鳴らし始められない）
+function resetAudioEngine() {
+  if (!A.context || A.failed) return;
+  const old = A.context;
+  A.context = null;
+  A.engine = null;
+  A.unlocked = false;
+  old.close().catch(() => {});
+  startAudio();
 }
 // スマホで音が出ない対策
 //  ・iPhone はマナー（消音）スイッチがONだとWeb Audioが無音になる → 「再生」用の音声として扱わせる
@@ -374,14 +390,17 @@ function toggleAudio(kind) {
 }
 
 // ---- 音を鳴らす部品 ----
+// 作った部品（パンナー・リバーブ送り）を返す。鳴り終わったら呼び出し元でまとめて切り離す
 function routeSound(node, o) {
   const context = A.context;
+  const created = [node];
   let out = node;
   if (o.pan && context.createStereoPanner) {
     const panner = context.createStereoPanner();
     panner.pan.value = clamp(o.pan, -1, 1);
     node.connect(panner);
     out = panner;
+    created.push(panner);
   }
   const music = o.bus === 'music' || o.bus === 'duck';
   out.connect(o.bus === 'duck' ? A.musicDuck : (music ? A.musicBus : A.sfxBus));
@@ -390,13 +409,26 @@ function routeSound(node, o) {
     send.gain.value = o.reverb;
     out.connect(send);
     send.connect(music ? A.musicReverb : A.sfxReverb);
+    created.push(send);
   }
   if (o.echo && music) {
     const send = context.createGain();
     send.gain.value = o.echo;
     out.connect(send);
     send.connect(A.delayIn);
+    created.push(send);
   }
+  return created;
+}
+// 鳴り終わった音の部品をすべて切り離す（残しておくとiPhoneでは溜まり続け、音飛び・動作の遅れの原因になる）
+function releaseNodes(nodes) {
+  nodes.forEach(node => {
+    try {
+      node.disconnect();
+    } catch (error) {
+      // すでに切り離されている
+    }
+  });
 }
 // 1音（エンベロープ・フィルター・歪み・ビブラート付き）
 function voice(o) {
@@ -411,15 +443,19 @@ function voice(o) {
   if (o.freqFrom) osc.frequency.exponentialRampToValueAtTime(o.freq, t + 0.04);   // しゃくり上げ（ギター風）
   if (o.freqEnd) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.freqEnd), t + (o.glide || dur));
   if (o.detune) osc.detune.value = o.detune;
+  /** @type {AudioNode[]} */
+  const nodes = [osc];
   let head = osc;
   if (o.drive) {
     const shaper = context.createWaveShaper();
     shaper.curve = o.drive > 3 ? A.driveHard : A.driveSoft;
     head.connect(shaper);
     head = shaper;
+    nodes.push(shaper);
   }
   if (o.cutoff) {
     const filter = context.createBiquadFilter();
+    nodes.push(filter);
     filter.type = o.filterType || 'lowpass';
     filter.Q.value = o.q || 0.8;
     filter.frequency.setValueAtTime(o.cutoff, t);
@@ -438,10 +474,11 @@ function voice(o) {
   if (o.decay) env.gain.setTargetAtTime(o.vol * (o.sustain !== undefined ? o.sustain : 0.6), t + attack, o.decay / 3);
   env.gain.setTargetAtTime(0.0001, t + dur, release / 4);
   head.connect(env);
-  routeSound(env, o);
+  nodes.push(...routeSound(env, o));
   if (o.vibrato) {
     const lfo = context.createOscillator();
     const depth = context.createGain();
+    nodes.push(lfo, depth);
     lfo.frequency.value = 6;
     depth.gain.setValueAtTime(0, t);
     depth.gain.linearRampToValueAtTime(o.vibrato, t + 0.22);
@@ -452,12 +489,15 @@ function voice(o) {
   }
   osc.start(t);
   osc.stop(t + dur + release + 0.1);
-  osc.onended = () => osc.disconnect();
+  osc.onended = () => releaseNodes(nodes);
 }
 function supersaw(o) {
   const spread = o.spread || 14;
-  [-spread, -spread / 2, 0, spread / 2, spread].forEach((d, i) => voice({
-    ...o, type: 'sawtooth', detune: d + (o.detune || 0), vol: o.vol / 2.4, pan: (o.pan || 0) + (i - 2) * 0.18
+  // 軽量モード（スマホ向け）では重ねる数を5→3に減らして処理を軽くする
+  const detunes = raceOptions.quality === 'low' ? [-spread, 0, spread] : [-spread, -spread / 2, 0, spread / 2, spread];
+  const mid = (detunes.length - 1) / 2;
+  detunes.forEach((d, i) => voice({
+    ...o, type: 'sawtooth', detune: d + (o.detune || 0), vol: o.vol / (detunes.length === 3 ? 1.8 : 2.4), pan: (o.pan || 0) + (i - mid) * 0.18
   }));
 }
 function noiseBurst(o) {
@@ -472,11 +512,14 @@ function noiseBurst(o) {
   if (o.f1) filter.frequency.exponentialRampToValueAtTime(Math.max(40, o.f1), t + (o.sweep || o.dur));
   let head = filter;
   source.connect(filter);
+  /** @type {AudioNode[]} */
+  const nodes = [source, filter];
   if (o.drive) {
     const shaper = context.createWaveShaper();
     shaper.curve = A.driveHard;
     filter.connect(shaper);
     head = shaper;
+    nodes.push(shaper);
   }
   const env = context.createGain();
   const attack = o.attack || 0.004;
@@ -484,10 +527,10 @@ function noiseBurst(o) {
   env.gain.linearRampToValueAtTime(o.vol, t + attack);
   env.gain.setTargetAtTime(0.0001, t + attack, (o.dur - attack) / 4);
   head.connect(env);
-  routeSound(env, o);
+  nodes.push(...routeSound(env, o));
   source.start(t, Math.random() * 1.2);
   source.stop(t + o.dur + 0.1);
-  source.onended = () => source.disconnect();
+  source.onended = () => releaseNodes(nodes);
 }
 function drumHit(name, at, vol, o = {}) {
   const context = A.context;
@@ -496,9 +539,9 @@ function drumHit(name, at, vol, o = {}) {
   const gain = context.createGain();
   gain.gain.value = vol;
   source.connect(gain);
-  routeSound(gain, { bus: o.bus || 'music', pan: o.pan, reverb: o.reverb });
+  const nodes = [source, ...routeSound(gain, { bus: o.bus || 'music', pan: o.pan, reverb: o.reverb })];
   source.start(at);
-  source.onended = () => source.disconnect();
+  source.onended = () => releaseNodes(nodes);
 }
 function clang(at, vol, base) {
   [1, 2.32, 3.41, 4.63, 6.1].forEach((ratio, i) => voice({

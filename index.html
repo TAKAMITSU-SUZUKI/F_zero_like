@@ -572,6 +572,7 @@
     .step-extra { margin-top: 2px; }
     .step-extras { display: flex; gap: 8px; justify-content: center; }
     #controlToggle.tilt { border-color: #4ade80; color: #bbf7d0; }
+    .version-tag { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #64748b; pointer-events: none; }
     #tiltDiag {
       margin-top: 6px; padding: 6px 8px; border-radius: 8px; white-space: pre-wrap; font: 11px/1.5 monospace;
       color: #e2e8f0; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.35);
@@ -615,7 +616,7 @@
 <body>
 <div id="wrap" class="selecting">
   <!-- 読み込みが終わり最初の画面が描けるまで覆っておく（途中の画面が見えないように） -->
-  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v8</div></div>
+  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v9</div></div>
   <canvas id="gl"></canvas>
   <canvas id="c" width="800" height="450"></canvas>
   <div id="hud">
@@ -768,6 +769,7 @@
       <div class="select-desc" id="machineDesc"></div>
     </div>
     <div class="select-hint">← → : 選ぶ / Enter : 次へ / Esc : 戻る / M : BGM / N : 効果音</div>
+    <div class="version-tag">2026-11-22 v9</div>
   </div>
 </div>
 
@@ -4771,12 +4773,12 @@ function enableTilt() {
     tiltFailed('この端末では傾き操作が使えません');
     return;
   }
-  // iPhone: タップした操作の中で、動き・向きの両方のセンサーの許可を同時に求める
+  // iPhone: タップした操作の中で許可を求める。動きと向きは同じ許可なので、確認は1回だけにする
+  // （2回同時に求めると、2回目が確認画面なしで「拒否」になることがある）
   const asks = [];
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
     asks.push(DeviceMotionEvent.requestPermission());
-  }
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+  } else if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
     asks.push(DeviceOrientationEvent.requestPermission());
   }
   if (!asks.length) {
@@ -4788,7 +4790,7 @@ function enableTilt() {
   Promise.allSettled(asks).then(results => {
     tilt.permission = results.map(r => (r.status === 'fulfilled' ? r.value : `エラー: ${r.reason && r.reason.name}`)).join(' / ');
     if (results.some(r => r.status === 'fulfilled' && r.value === 'granted')) begin();
-    else tiltFailed('傾きセンサーの使用が許可されませんでした。設定アプリ → Safari →「モーションと画面の向きのアクセス」をONにしてください');
+    else tiltFailed('傾きセンサーが拒否されました。Safariを完全に閉じて（上にスワイプして終了）開き直し、確認が出たら「許可」を押してください');
   });
 }
 // 毎フレーム: なめらかにしてハンドル量へ。メーター表示も更新
@@ -4891,7 +4893,7 @@ function toggleFullscreen() {
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
 // ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
-const APP_VERSION = '2026-11-22 v8';
+const APP_VERSION = '2026-11-22 v9';
 let tiltDiagTimer = null;
 function renderTiltDiag() {
   const ua = navigator.userAgent;
@@ -4905,7 +4907,7 @@ function renderTiltDiag() {
   if (!window.isSecureContext) verdict = '× https で開いていません。https:// のURLで開いてください';
   else if (inApp) verdict = '× アプリ内ブラウザです。Safari / Chrome で開き直してください';
   else if (!hasMotion && !hasOrient) verdict = '× この端末・ブラウザは傾きセンサーに対応していません';
-  else if (tilt.permission && /denied|エラー/.test(tilt.permission)) verdict = '× 許可されていません。設定アプリ → Safari →「モーションと画面の向きのアクセス」をON → ページを再読み込み';
+  else if (tilt.permission && /denied|エラー/.test(tilt.permission)) verdict = '× 拒否されています。Safariを完全に終了して開き直し、このボタンを押して出る確認で「許可」を選んでください（以前「許可しない」を選ぶと、確認が出ずに拒否されます）';
   else if (!(tilt.motionEvents || tilt.orientEvents)) verdict = '… センサーの値を待っています（届かない場合はブラウザがブロックしています）';
   else if (!tilt.supported) verdict = '△ センサーは反応していますが値が空です（この端末では使えない可能性）';
   else verdict = '○ 正常です。スマホをハンドルのように左右に回すと下の％が変わります';

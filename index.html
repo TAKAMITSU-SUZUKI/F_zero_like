@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" id="viewportMeta" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>F-ZERO風 3Dレースプロトタイプ</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- ネオンの発光（ブルーム）用。読み込めなくても通常描画で動く -->
@@ -19,7 +19,7 @@
       -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none;
     }
     body, html {
-      width: 100%; height: 100%;
+      width: 100%; height: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
       background: #05050a;
       display: flex; justify-content: center; align-items: center;
       overflow: hidden; font-family: 'Segoe UI', sans-serif; color: #fff;
@@ -498,7 +498,15 @@
     #touch .btn.boost { grid-area: boost; }
     #touch .btn { background: radial-gradient(circle at 35% 30%, rgba(30, 64, 110, 0.6), rgba(7, 13, 30, 0.5)); }
     #touch .btn.drift.on { background: rgba(162, 28, 175, 0.75); }
-    #touch .tilt-meter { bottom: max(8px, env(safe-area-inset-bottom)); }
+    /* 傾き操作のハンドル表示（左下、普段 ◀▶ がある場所） */
+    #touch .tilt-meter {
+      left: max(16px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); transform: none;
+      width: clamp(70px, 28vh, 110px); height: auto; background: none; border: 0; text-align: center;
+    }
+    #touch .tilt-meter svg { width: 100%; display: block; transition: transform 40ms linear; filter: drop-shadow(0 0 6px #22d3ee); }
+    #touch .tilt-meter span { position: static; display: block; margin-top: 2px; font-size: 10px; line-height: 1.2; color: #a5f3fc; letter-spacing: 1px; text-shadow: 0 1px 3px #000; }
+    #touch .tilt-meter.waiting svg { opacity: 0.35; filter: none; }
+    #touch .tilt-meter.waiting span { color: #fca5a5; }
     /* とても低い画面（アプリ内ブラウザの横向きなど）はHUDをさらに小さく */
     @media (max-height: 360px) {
       .hud-panel, .help-panel { padding: 3px 7px; }
@@ -629,7 +637,16 @@
       <div class="btn big" id="bLeft">◀</div>
       <div class="btn big" id="bRight">▶</div>
     </div>
-    <div class="tilt-meter" id="tiltMeter"><i id="tiltNeedle"></i><span>TILT</span></div>
+    <!-- 傾き操作のときに出るハンドル（スマホを回した分だけ回る） -->
+    <div class="tilt-meter" id="tiltMeter">
+      <svg id="tiltWheel" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="#22d3ee" stroke-width="9"/>
+        <circle cx="50" cy="50" r="10" fill="#0e7490" stroke="#67e8f9" stroke-width="3"/>
+        <path d="M10 52 H40 M60 52 H90 M50 60 V92" stroke="#67e8f9" stroke-width="7" stroke-linecap="round"/>
+        <rect x="45" y="3" width="10" height="12" rx="3" fill="#fde047"/>
+      </svg>
+      <span>TILT</span>
+    </div>
     <div class="group action-group">
       <div class="btn mid gas" id="bGas">GO</div>
       <div class="btn big drift" id="bDrift">DRIFT</div>
@@ -926,8 +943,10 @@ function writeStore(key, value) {
 // オプション: 周回数・ライバル数・難易度・操作方法・画質など
 const raceOptions = readStore('fzx-options', {
   laps: 3, rivals: 15, difficulty: 1, control: 'buttons', autoAccel: IS_TOUCH,
-  steer: 1, tiltRange: 22, touchLift: 0, quality: IS_TOUCH ? 'low' : 'high'
+  steer: 1, tiltRange: 14, touchLift: 0, quality: IS_TOUCH ? 'low' : 'high'
 });
+// 以前の初期値（22°）は傾け量が大きすぎて曲がらないと感じやすいので、新しい初期値に置き換える
+if (raceOptions.tiltRange === 22) raceOptions.tiltRange = 14;
 // ガレージ: マシンごとの色・エンジンの光・チューニング
 const garage = readStore('fzx-garage', {});
 let paused = false;
@@ -1068,6 +1087,39 @@ steerPad.addEventListener('lostpointercapture', releaseSteer);
 bindBtn('bGas', 'gas'); bindBtn('bBoost', 'boost');
 // 長押しメニュー（画像の保存など）を出さない
 document.getElementById('wrap').addEventListener('contextmenu', event => event.preventDefault());
+
+// ===== 画面の拡大を防ぐ（iPhoneは拡大禁止の指定を無視するため、ここで止める） =====
+// ・操作ボタンへのタッチは拡大・スクロールの動作をすべて止める（ボタンの反応は pointer イベントで受けるので影響なし）
+const touchLayer = document.getElementById('touch');
+['touchstart', 'touchmove', 'touchend'].forEach(type => touchLayer.addEventListener(type, event => {
+  if (event.cancelable) event.preventDefault();
+}, { passive: false }));
+// ・2本指で広げる拡大（ピンチ）を止める
+['gesturestart', 'gesturechange', 'gestureend'].forEach(type => document.addEventListener(type, event => event.preventDefault()));
+document.addEventListener('touchmove', event => {
+  if (event.touches.length > 1 && event.cancelable) event.preventDefault();
+}, { passive: false });
+// ・素早い2回タップでの拡大を止める（入力欄は除く）
+let lastTouchEnd = 0;
+document.addEventListener('touchend', event => {
+  const now = Date.now();
+  const target = event.target;
+  const tag = target && target.tagName;
+  // メニューのボタンを素早く続けて押した操作は消さない
+  const isButton = target && target.closest && target.closest('button');
+  if (now - lastTouchEnd < 350 && !isButton && tag !== 'INPUT' && tag !== 'TEXTAREA' && event.cancelable) event.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('dblclick', event => event.preventDefault(), { passive: false });
+// ・それでも拡大されてしまったら、等倍に戻す
+const viewportMeta = document.getElementById('viewportMeta');
+function resetZoom() {
+  if (!window.visualViewport || window.visualViewport.scale <= 1.01) return;
+  const content = viewportMeta.content;
+  viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover';
+  setTimeout(() => { viewportMeta.content = content; }, 50);
+}
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resetZoom);
 bindBtn('bDrift', 'drift');
 
 function releaseAllInputs() {
@@ -3355,7 +3407,8 @@ function update(dt, now) {
   const energyLimit = car.energy > 0 ? 1 : 0.62;
   // ハンドル: ボタン/キーは -1・0・1、傾き操作はその間の連続値（ボタンが押されていればボタン優先）
   const digitalSteer = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-  const steer = digitalSteer !== 0 || !tilt.active ? digitalSteer : tilt.value;
+  // 傾き操作はボタンより曲がりが弱く感じやすいので 1.5倍に強めて使う（最大はボタンと同じ）
+  const steer = digitalSteer !== 0 || !tilt.active ? digitalSteer : clamp(tilt.value * 1.5, -1, 1);
   car.steerAxis = steer;
   // ドリドリの切り返し判定は「どちらに切っているか」だけを見る
   const steerDir = Math.abs(steer) > 0.35 ? Math.sign(steer) : 0;
@@ -4567,7 +4620,7 @@ const OPTION_DEFS = [
   { key: 'control', label: 'スマホの操作', type: 'choice', choices: [['buttons', 'ボタン'], ['tilt', '傾けて曲がる']] },
   { key: 'autoAccel', label: 'オートアクセル（GOボタンがブレーキになる）', type: 'choice', choices: [[true, 'ON'], [false, 'OFF']] },
   { key: 'steer', label: 'ハンドル感度', type: 'range', min: 0.6, max: 1.5, step: 0.05, format: v => `×${v.toFixed(2)}` },
-  { key: 'tiltRange', label: '傾きの量（小さいほど少し傾けるだけで曲がる）', type: 'range', min: 10, max: 40, step: 1, format: v => `${v}°` },
+  { key: 'tiltRange', label: '傾きの量（ハンドルを最大まで切る角度。小さいほど敏感）', type: 'range', min: 6, max: 30, step: 1, format: v => `${v}°` },
   { key: 'touchLift', label: 'スマホのボタンの位置（下の表示と重なる場合は上げる）', type: 'choice', choices: [[0, '標準'], [50, '少し上'], [100, '上']] },
   { key: 'quality', label: '画質', type: 'choice', choices: [['high', '高画質'], ['low', '軽量（スマホ向け）']] }
 ];
@@ -4612,8 +4665,21 @@ function applyOptions() {
 function onDeviceMotion(event) {
   const g = event.accelerationIncludingGravity;
   if (!g || g.x === null || g.y === null || g.x === undefined) return;
+  tilt.motionAt = performance.now();
+  applyGravity(g.x, g.y);
+}
+// 予備: 「向きのセンサー」（beta/gamma）から重力の向きを計算する。
+// アプリ内ブラウザなど、動きのセンサーが届かない環境向け（動きのセンサーが来ている間は使わない）
+function onDeviceOrientation(event) {
+  if (event.beta === null || event.gamma === null || event.beta === undefined) return;
+  if (performance.now() - (tilt.motionAt || -1e9) < 500) return;
+  const b = event.beta * Math.PI / 180, g = event.gamma * Math.PI / 180;
+  applyGravity(-Math.cos(b) * Math.sin(g) * 9.81, Math.sin(b) * 9.81);
+}
+function applyGravity(gx, gy) {
   tilt.supported = true;
   tilt.lastEvent = performance.now();
+  const g = { x: gx, y: gy };
   const magnitude = Math.hypot(g.x, g.y);
   if (magnitude < 2.5) return;   // 端末をほぼ水平に寝かせていると向きが定まらない
   const cx = g.x / magnitude, cy = g.y / magnitude;
@@ -4624,8 +4690,10 @@ function onDeviceMotion(event) {
   const cross = tilt.cal.x * cy - tilt.cal.y * cx;
   const dot = tilt.cal.x * cx + tilt.cal.y * cy;
   const degrees = Math.atan2(cross, dot) * 180 / Math.PI;
-  let value = degrees / raceOptions.tiltRange;
-  if (Math.abs(value) < 0.06) value = 0;   // わずかな手ぶれは無視
+  // 手ぶれ程度（約1.5°）は無視し、そこから「傾きの量」の角度で最大まで切れる。
+  // 少し傾けただけでも効くよう、小さい角度を強めに反映する
+  const usable = Math.max(0, Math.abs(degrees) - 1.5) / Math.max(4, raceOptions.tiltRange - 1.5);
+  let value = Math.sign(degrees) * Math.pow(Math.min(1, usable), 0.8);
   tilt.raw = clamp(value, -1, 1);
 }
 function tiltFailed(message) {
@@ -4637,34 +4705,53 @@ function enableTilt() {
   const begin = () => {
     if (!tilt.listening) {
       addEventListener('devicemotion', onDeviceMotion);
+      addEventListener('deviceorientation', onDeviceOrientation);
       tilt.listening = true;
     }
     tilt.active = true;
     tilt.needsCalibration = true;
     applyOptions();
     setTimeout(() => {
-      if (tilt.active && !tilt.supported) tiltFailed('傾きセンサーが反応しません。https のページで開いているか確認してください（ボタン操作に切り替えます）');
-    }, 2000);
+      if (tilt.active && !tilt.supported) {
+        tiltFailed('傾きセンサーの値が届きません。LINEなどのアプリ内ブラウザでは使えないことがあるので、Safari / Chrome で開いてください（ボタン操作に切り替えます）');
+      }
+    }, 2500);
   };
-  if (typeof DeviceMotionEvent === 'undefined') {
+  if (typeof DeviceMotionEvent === 'undefined' && typeof DeviceOrientationEvent === 'undefined') {
     tiltFailed('この端末では傾き操作が使えません');
     return;
   }
-  if (typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission()
-      .then(state => (state === 'granted' ? begin() : tiltFailed('傾きセンサーの使用が許可されませんでした')))
-      .catch(() => tiltFailed('傾きセンサーを使えませんでした（https で開く必要があります）'));
-  } else {
-    begin();
+  // iPhone: タップした操作の中で、動き・向きの両方のセンサーの許可を同時に求める
+  const asks = [];
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    asks.push(DeviceMotionEvent.requestPermission());
   }
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    asks.push(DeviceOrientationEvent.requestPermission());
+  }
+  if (!asks.length) {
+    begin();
+    return;
+  }
+  Promise.allSettled(asks).then(results => {
+    if (results.some(r => r.status === 'fulfilled' && r.value === 'granted')) begin();
+    else tiltFailed('傾きセンサーの使用が許可されませんでした。設定アプリ → Safari →「モーションと画面の向きのアクセス」をONにしてください');
+  });
 }
 // 毎フレーム: なめらかにしてハンドル量へ。メーター表示も更新
-const tiltNeedle = document.getElementById('tiltNeedle');
 function updateTilt() {
   if (!tilt.active) return;
-  tilt.value += (tilt.raw - tilt.value) * 0.35;
-  tiltNeedle.style.left = `${50 + tilt.value * 44}%`;
+  tilt.value += (tilt.raw - tilt.value) * 0.5;
+  // 画面のハンドルを、スマホを回した角度と同じだけ回す
+  tiltWheel.style.transform = `rotate(${tilt.value * raceOptions.tiltRange}deg)`;
+  // センサーの状態を表示（値が来ていない／止まっているのが分かるように）
+  const fresh = tilt.supported && performance.now() - tilt.lastEvent < 1000;
+  tiltMeterEl.classList.toggle('waiting', !fresh);
+  tiltLabel.textContent = fresh ? `ハンドル ${tilt.value > 0.05 ? '右' : (tilt.value < -0.05 ? '左' : '')} ${Math.round(Math.abs(tilt.value) * 100)}%` : 'センサー待ち…';
 }
+const tiltWheel = document.getElementById('tiltWheel');
+const tiltMeterEl = document.getElementById('tiltMeter');
+const tiltLabel = document.querySelector('#tiltMeter span');
 
 // ---- 一時停止・全画面 ----
 const pauseOverlay = document.getElementById('pauseOverlay');
@@ -6251,7 +6338,8 @@ requestAnimationFrame(loop);
         camera.position.x += (Math.random() - 0.5) * car.shake * 0.35;
         camera.position.y += (Math.random() - 0.5) * car.shake * 0.35;
       }
-      camUp.copy(camFrame.u).addScaledVector(camFrame.r, car.tilt * 0.05).normalize();
+      // 傾き操作中は、スマホを回すのに合わせて画面も少し傾け、ハンドルを切っている感覚を出す
+      camUp.copy(camFrame.u).addScaledVector(camFrame.r, car.tilt * (tilt.active ? 0.13 : 0.05)).normalize();
       camera.up.copy(camUp);
       camera.lookAt(lookAt);
       targetFov = 70 + speedRatio * 10 + (boosting ? 5 : 0);

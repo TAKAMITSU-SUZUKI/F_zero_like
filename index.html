@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" id="viewportMeta" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>F-ZERO風 3Dレースプロトタイプ</title>
+  <script>
+    // LINEのアプリ内ブラウザは傾きセンサーを使わせてくれないため、標準ブラウザ（Safari/Chrome）で開き直す。
+    // LINEはURLに openExternalBrowser=1 を付けると外部ブラウザで開く仕様になっている
+    (function () {
+      if (!/\bLine\//i.test(navigator.userAgent)) return;
+      var url = new URL(location.href);
+      if (url.searchParams.get('openExternalBrowser') === '1') return;
+      url.searchParams.set('openExternalBrowser', '1');
+      location.replace(url.toString());
+    })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- ネオンの発光（ブルーム）用。読み込めなくても通常描画で動く -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>

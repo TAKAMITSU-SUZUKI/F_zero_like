@@ -185,6 +185,9 @@ function renderParts(flashSlot) {
   resetButton.disabled = refund === 0;
   resetButton.textContent = refund ? `パーツを全部売る（${refund}pt 返還）` : 'パーツを全部売る（未購入）';
   delete resetButton.dataset.armed;
+  // パーツを選んだら、説明と購入ボタンが画面に収まるところまで自動でスクロールする
+  const detail = /** @type {HTMLElement | null} */ (list.querySelector('.part-detail'));
+  if (detail) revealInSetup(detail);
 }
 // 選んだパーツの説明と、購入・装着ボタン
 function partDetail(slotKey, id, loadout, cap, used) {
@@ -550,7 +553,7 @@ function toggleFullscreen() {
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
 // ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
-const APP_VERSION = '2026-11-22 v12';
+const APP_VERSION = '2026-11-22 v13';
 let tiltDiagTimer = null;
 function renderTiltDiag() {
   const ua = navigator.userAgent;
@@ -868,6 +871,57 @@ document.getElementById('loadCode').addEventListener('click', () => {
   const input = /** @type {HTMLInputElement} */ (document.getElementById('importCode'));
   if (importCourseCode(input.value)) input.value = '';
 });
+
+// ---- 指でなぞる縦スクロール（設定パネル・リザルト） ----
+// 縦持ちのスマホで画面を90°回して表示していると、ブラウザ標準のスクロールは
+// 指の向きとゲーム画面の上下が合わず動かない。そのため指の動きを自分で読み取ってスクロールする
+let dragScrollBlockUntil = 0;
+function enableDragScroll(container) {
+  let drag = null;
+  container.addEventListener('pointerdown', event => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    if (target.closest('input, textarea')) return;   // スライダーや入力欄の操作は邪魔しない
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, top: container.scrollTop, moved: false };
+  });
+  addEventListener('pointermove', event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+    // 画面の回転に合わせて、ゲーム画面での「下向き」の移動量に直す
+    const down = portraitView.rot === 90 ? -dx : (portraitView.rot === 270 ? dx : dy);
+    if (!drag.moved && Math.abs(down) < 8) return;
+    drag.moved = true;
+    container.scrollTop = drag.top - down;
+  });
+  const end = event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    if (drag.moved) dragScrollBlockUntil = performance.now() + 80;   // なぞった直後のタップ扱いを止める
+    drag = null;
+  };
+  addEventListener('pointerup', end);
+  addEventListener('pointercancel', end);
+  container.addEventListener('click', event => {
+    if (performance.now() < dragScrollBlockUntil) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+  }, true);
+}
+enableDragScroll(document.querySelector('.setup-body'));
+enableDragScroll(document.getElementById('resultOverlay'));
+// 設定パネル内の要素が見えるようにスクロールする（回転表示でも正しく動くよう、レイアウト上の位置で計算）
+function revealInSetup(el) {
+  const container = /** @type {HTMLElement} */ (document.querySelector('.setup-body'));
+  let top = 0;
+  let node = el;
+  while (node && node !== container) {
+    top += node.offsetTop;
+    node = /** @type {HTMLElement} */ (node.offsetParent);
+  }
+  if (node !== container) return;
+  const bottom = top + el.offsetHeight;
+  if (bottom > container.scrollTop + container.clientHeight) container.scrollTop = Math.min(top - 8, bottom - container.clientHeight + 8);
+  else if (top < container.scrollTop) container.scrollTop = top - 8;
+}
 
 // ---- タブ切り替え ----
 function setTab(tab) {

@@ -17,7 +17,10 @@ body, html {
 }
 input, textarea { user-select: text; -webkit-user-select: text; touch-action: manipulation; }
 /* 画面全体はタッチでスクロールしない設定だが、設定パネル・リザルト・一時停止の中だけは縦スクロールできるようにする */
-.setup-body, .setup-body *, #resultOverlay, #resultOverlay *, #pauseOverlay, #pauseOverlay * { touch-action: pan-y; }
+/* 設定パネル・リザルトの縦スクロールは JS（enableDragScroll）で処理する。
+   画面を90°回して表示していると、ブラウザ標準のスクロールは向きが合わず動かないため */
+.setup-body, .setup-body *, #resultOverlay, #resultOverlay * { touch-action: none; }
+#pauseOverlay, #pauseOverlay * { touch-action: pan-y; }
 canvas { width: 100%; height: 100%; display: block; }
 #gl, #c { position: absolute; inset: 0; }
 #hud {
@@ -282,7 +285,7 @@ canvas { width: 100%; height: 100%; display: block; }
   color: #94a3b8; background: rgba(7, 14, 34, 0.7); border: 1px solid rgba(148, 163, 184, 0.3); border-bottom: 0;
 }
 .setup-tabs button.active { color: #fff; background: rgba(8, 145, 178, 0.55); border-color: #22d3ee; }
-.setup-body { width: 100%; max-width: 980px; flex: 1; min-height: 0; overflow-y: auto; pointer-events: none; }
+.setup-body { position: relative; width: 100%; max-width: 980px; flex: 1; min-height: 0; overflow-y: auto; pointer-events: none; }
 .tab-panel { display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
 .tab-panel[hidden] { display: none; }
 /* ガレージ・エディタ・オプションは左側のパネルにして、右側でマシンやコースが見えるようにする */

@@ -112,7 +112,7 @@
     /* ===== 一時停止 ===== */
     /* 進行バー（中央上部・幅は画面の高さに比例）のすぐ右に置く */
     #pauseBtn {
-      position: absolute; top: max(2px, calc(3.56vh - 20px)); top: max(2px, calc(3.56dvh - 20px)); left: calc(50% + 33.4vh + 12px); left: calc(50% + 33.4dvh + 12px); z-index: 3;
+      position: absolute; top: max(2px, calc(3.56vmin - 20px)); left: calc(50% + 33.4vmin + 12px); z-index: 3;
       width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font: inherit; font-weight: 900; font-size: 15px;
       color: #e0f2fe; background: rgba(2, 6, 23, 0.55); border: 1px solid rgba(103, 232, 249, 0.45);
     }
@@ -139,9 +139,13 @@
     }
     #rotateHint div { font-size: 54px; animation: rotateHint 1.6s ease-in-out infinite; }
     @keyframes rotateHint { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
-    @media (orientation: portrait) and (pointer: coarse) {
-      #rotateHint { display: grid; }
+    /* 画面が縦向き（回転ロック中など）でも、横に持って遊べるようゲーム画面を90°回して表示する */
+    #wrap.rot90, #wrap.rot270 {
+      position: fixed; top: 0; left: 0; transform-origin: top left;
+      width: 100vh; width: 100dvh; height: 100vw;
     }
+    #wrap.rot90 { transform: translateX(100vw) rotate(90deg); }
+    #wrap.rot270 { transform: translateY(100vh) rotate(-90deg); transform: translateY(100dvh) rotate(-90deg); }
     .race-gap { margin-top: 3px; min-height: 15px; font-size: 11px; color: #cbd5e1; font-variant-numeric: tabular-nums; }
     .race-gap .lose { color: #fda4af; }
     .race-gap .gain { color: #86efac; }
@@ -374,7 +378,7 @@
       padding: 4px 10px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 800;
       color: #cffafe; background: rgba(7, 14, 34, 0.78); border: 1px solid rgba(103, 232, 249, 0.5); white-space: nowrap;
     }
-    @media (max-width: 600px) {
+    @media (max-width: 600px) and (min-aspect-ratio: 1/1) {
       #selectOverlay { padding: 6px 8px; }
       .select-title { font-size: 14px; letter-spacing: 3px; }
       .machine-cards { gap: 5px; margin-top: 5px; }
@@ -403,7 +407,7 @@
       .result-title { font-size: 20px; }
     }
     /* ===== スマホの横画面（高さが低い画面）向けのレイアウト ===== */
-    @media (max-height: 520px) {
+    @media (max-height: 520px), (max-width: 520px) and (orientation: portrait) {
       #hud { top: max(6px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); }
       .hud-panel { padding: 5px 8px; }
       .speed-box { font-size: 18px; }
@@ -421,7 +425,7 @@
       #banner { font-size: 40px; top: 18%; }
       #toast { font-size: 12px; top: 32%; }
       #controlsHint { bottom: auto; top: 44%; font-size: 10px; }
-      #pauseBtn { width: 34px; height: 34px; top: max(2px, calc(3.56dvh - 17px)); font-size: 13px; }
+      #pauseBtn { width: 34px; height: 34px; top: max(2px, calc(3.56vmin - 17px)); font-size: 13px; }
       .btn.big { width: 76px; height: 76px; }
       .btn.mid { width: 56px; height: 56px; font-size: 11px; }
       .select-title { font-size: 14px; letter-spacing: 3px; }
@@ -465,7 +469,7 @@
       .pause-card { padding: 10px 14px; }
       .pause-toggles { margin-top: 8px; }
     }
-    @media (max-width: 600px) {
+    @media (max-width: 600px) and (min-aspect-ratio: 1/1) {
       #hud { top: 8px; left: 8px; right: 8px; }
       .hud-panel { padding: 6px 8px; }
       .speed-box { font-size: 20px; }
@@ -483,16 +487,16 @@
     #touch { left: 0; right: 0; bottom: 0; top: 0; align-items: stretch; }
     #touch .steer-group {
       position: absolute; left: max(12px, env(safe-area-inset-left));
-      bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--touch-lift, 0px)); gap: 2.5vh;
+      bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--touch-lift, 0px)); gap: 2.5vmin;
     }
     #touch .action-group {
       position: absolute; right: max(12px, env(safe-area-inset-right));
       bottom: calc(max(10px, env(safe-area-inset-bottom)) + 56px + var(--touch-lift, 0px));
       display: grid; grid-template-columns: auto auto; grid-template-areas: "gas ." "drift boost";
-      gap: 1.5vh 2.5vh; align-items: end; justify-items: center;
+      gap: 1.5vmin 2.5vmin; align-items: end; justify-items: center;
     }
-    #touch .btn.big { width: clamp(56px, 23vh, 90px); height: clamp(56px, 23vh, 90px); font-size: clamp(11px, 3.6vh, 15px); }
-    #touch .btn.mid { width: clamp(40px, 15vh, 60px); height: clamp(40px, 15vh, 60px); font-size: clamp(9px, 3vh, 12px); margin: 0; }
+    #touch .btn.big { width: clamp(56px, 23vmin, 90px); height: clamp(56px, 23vmin, 90px); font-size: clamp(11px, 3.6vmin, 15px); }
+    #touch .btn.mid { width: clamp(40px, 15vmin, 60px); height: clamp(40px, 15vmin, 60px); font-size: clamp(9px, 3vmin, 12px); margin: 0; }
     #touch .btn.gas { grid-area: gas; }
     #touch .btn.drift { grid-area: drift; border-color: rgba(240, 171, 252, 0.8); color: #f5d0fe; }
     #touch .btn.boost { grid-area: boost; }
@@ -501,14 +505,14 @@
     /* 傾き操作のハンドル表示（左下、普段 ◀▶ がある場所） */
     #touch .tilt-meter {
       left: max(16px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); transform: none;
-      width: clamp(70px, 28vh, 110px); height: auto; background: none; border: 0; text-align: center;
+      width: clamp(70px, 28vmin, 110px); height: auto; background: none; border: 0; text-align: center;
     }
     #touch .tilt-meter svg { width: 100%; display: block; transition: transform 40ms linear; filter: drop-shadow(0 0 6px #22d3ee); }
     #touch .tilt-meter span { position: static; display: block; margin-top: 2px; font-size: 10px; line-height: 1.2; color: #a5f3fc; letter-spacing: 1px; text-shadow: 0 1px 3px #000; }
     #touch .tilt-meter.waiting svg { opacity: 0.35; filter: none; }
     #touch .tilt-meter.waiting span { color: #fca5a5; }
     /* とても低い画面（アプリ内ブラウザの横向きなど）はHUDをさらに小さく */
-    @media (max-height: 360px) {
+    @media (max-height: 360px), (max-width: 360px) and (orientation: portrait) {
       .hud-panel, .help-panel { padding: 3px 7px; }
       .speed-box { font-size: 15px; }
       .boost-box, .energy-box, .race-time { font-size: 8px; }
@@ -525,11 +529,11 @@
       background: radial-gradient(circle at 50% 60%, #1e1b4b, #020617 70%); transition: opacity 450ms, visibility 0s 450ms;
     }
     #splash.hide { opacity: 0; visibility: hidden; }
-    .splash-title { font-size: clamp(28px, 8vh, 56px); font-weight: 900; letter-spacing: 8px; color: #67e8f9; text-shadow: 0 0 24px #22d3ee; }
+    .splash-title { font-size: clamp(28px, 8vmin, 56px); font-weight: 900; letter-spacing: 8px; color: #67e8f9; text-shadow: 0 0 24px #22d3ee; }
     .splash-sub { font-size: 12px; letter-spacing: 4px; color: #94a3b8; animation: splashBlink 1s infinite; }
     @keyframes splashBlink { 50% { opacity: 0.3; } }
     /* 低い画面ではコース作成・色変更などの追加ボタンを下のバー（戻る/次へ の右）に置き、中央の機体を隠さない */
-    @media (max-height: 520px) {
+    @media (max-height: 520px), (max-width: 520px) and (orientation: portrait) {
       .step-extras, .step-extra {
         position: absolute; bottom: max(10px, env(safe-area-inset-bottom)); left: calc(max(16px, env(safe-area-inset-left)) + 250px); z-index: 1;
       }
@@ -568,9 +572,13 @@
     .step-extra { margin-top: 2px; }
     .step-extras { display: flex; gap: 8px; justify-content: center; }
     #controlToggle.tilt { border-color: #4ade80; color: #bbf7d0; }
+    #tiltDiag {
+      margin-top: 6px; padding: 6px 8px; border-radius: 8px; white-space: pre-wrap; font: 11px/1.5 monospace;
+      color: #e2e8f0; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.35);
+    }
     @media (hover: hover) and (pointer: fine) { .touch-only { display: none; } }
     /* 低い画面のマシン選択: 選んでいないマシンは名前だけにして、中央の機体が見えるようにする */
-    @media (max-height: 520px) {
+    @media (max-height: 520px), (max-width: 520px) and (orientation: portrait) {
       .setup-row.focus .machine-card:not(.active) .mc-stat { display: none; }
       .setup-row.focus .machine-cards { align-items: flex-start; }
       .setup-row.focus .machine-card { flex-basis: 120px; }
@@ -586,7 +594,7 @@
     #startBtn.go { background: linear-gradient(90deg, #16a34a, #0284c7); box-shadow: 0 0 20px rgba(74, 222, 128, 0.6); }
     .select-desc { padding-right: 230px; }
     .audio-toggles { flex-direction: row; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-    @media (max-height: 520px) {
+    @media (max-height: 520px), (max-width: 520px) and (orientation: portrait) {
       .step-bar button { padding: 4px 9px; font-size: 11px; }
       .icon-btn { padding: 5px 9px; font-size: 11px; }
       .tab-panel[data-panel="race"] .setup-row.focus { gap: 6px; margin-top: 4px; }
@@ -607,7 +615,7 @@
 <body>
 <div id="wrap" class="selecting">
   <!-- 読み込みが終わり最初の画面が描けるまで覆っておく（途中の画面が見えないように） -->
-  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div></div>
+  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v8</div></div>
   <canvas id="gl"></canvas>
   <canvas id="c" width="800" height="450"></canvas>
   <div id="hud">
@@ -667,6 +675,7 @@
         <button type="button" data-pause="se"></button>
         <button type="button" data-pause="control"></button>
         <button type="button" data-pause="calibrate">傾きの中心を合わせる</button>
+        <button type="button" data-pause="flip">↻ 画面の上下を反転</button>
         <button type="button" data-pause="fullscreen">⛶ 全画面</button>
       </div>
     </div>
@@ -742,6 +751,12 @@
           <button id="seToggle" type="button">🔊 SE: ON</button>
           <button id="soundTest" type="button">🔈 音のテスト</button>
           <button id="fullscreenBtn" type="button">⛶ 全画面</button>
+          <button id="flipBtn" type="button" class="touch-only">↻ 画面の上下を反転</button>
+        </div>
+        <div class="field tilt-diag">
+          <label>傾きセンサーの確認</label>
+          <button type="button" class="small-btn primary" id="tiltTest">📱 傾きセンサーをテストする</button>
+          <pre id="tiltDiag">ボタンを押すとセンサーの状態を表示します</pre>
         </div>
         <div id="optionControls"></div>
       </div>
@@ -897,7 +912,8 @@ let TOTAL_DISTANCE = LAP_DISTANCE * TOTAL_LAPS;
 let TRACK_ZONES = course.zones;
 
 function resizeCanvas() {
-  const rect = canvas.getBoundingClientRect();
+  // 画面を90°回して表示しているときも正しい大きさになるよう、回転前の大きさを使う
+  const rect = { width: canvas.clientWidth, height: canvas.clientHeight };
   const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2.5);
   canvas.width = Math.round(rect.width * pixelRatio);
   canvas.height = Math.round(rect.height * pixelRatio);
@@ -909,12 +925,36 @@ addEventListener('resize', resizeCanvas);
 // 画面サイズの変化を毎フレーム確認する。アプリ内ブラウザは回転やアドレスバーの出入りで
 // resize を通知しないことがあり、そのままだと古い縦横比で描かれて横に引き伸ばされる
 const viewportSize = { w: 0, h: 0 };
+// ---- 縦向きの画面で横持ちしたときは、ゲーム画面を90°回す ----
+// 回す向きは「向きのセンサー」で、スマホを左右どちらに倒して持っているかから決める
+const portraitView = { rot: 0, pref: 90 };
+function updatePortraitRotation() {
+  const portrait = IS_TOUCH && window.innerHeight > window.innerWidth;
+  const rot = portrait ? portraitView.pref : 0;
+  if (rot === portraitView.rot) return;
+  portraitView.rot = rot;
+  const wrap = document.getElementById('wrap');
+  wrap.classList.toggle('rot90', rot === 90);
+  wrap.classList.toggle('rot270', rot === 270);
+}
+addEventListener('deviceorientation', event => {
+  if (event.beta === null || event.gamma === null || event.beta === undefined) return;
+  // 端末から見た「上」の向き。x>0 は画面の右側が上（左に倒して持っている）
+  const upX = -Math.cos(event.beta * Math.PI / 180) * Math.sin(event.gamma * Math.PI / 180);
+  if (Math.abs(upX) > 0.7) portraitView.pref = upX > 0 ? 90 : 270;
+});
+function flipPortraitRotation() {
+  portraitView.pref = portraitView.pref === 90 ? 270 : 90;
+  portraitView.rot = 0;
+  updatePortraitRotation();
+}
 function watchViewportSize() {
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.round(rect.width), h = Math.round(rect.height);
+  updatePortraitRotation();
+  const w = Math.round(canvas.clientWidth), h = Math.round(canvas.clientHeight);
   if (w === viewportSize.w && h === viewportSize.h) return;
   viewportSize.w = w;
   viewportSize.h = h;
+  if (!w || !h) return;
   resizeCanvas();
   if (window.resize3D) window.resize3D();
 }
@@ -1052,9 +1092,14 @@ function bindBtn(id, k) {
 const steerPad = document.querySelector('.steer-group');
 const steerButtons = { left: document.getElementById('bLeft'), right: document.getElementById('bRight') };
 let steerPointer = null;
-function steerFromX(clientX) {
-  const rect = steerPad.getBoundingClientRect();
-  const right = clientX > rect.left + rect.width / 2;
+// 指に近いほうのボタンを押したことにする（画面を90°回して表示しているときも正しく判定できる）
+function steerFromX(clientX, clientY) {
+  const center = el => {
+    const r = el.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  };
+  const [lx, ly] = center(steerButtons.left), [rx, ry] = center(steerButtons.right);
+  const right = Math.hypot(clientX - rx, clientY - ry) < Math.hypot(clientX - lx, clientY - ly);
   keys.left = !right;
   keys.right = right;
   steerButtons.left.classList.toggle('on', !right);
@@ -1071,7 +1116,7 @@ steerPad.addEventListener('pointerdown', event => {
   event.preventDefault();
   startAudio();
   steerPointer = event.pointerId;
-  steerFromX(event.clientX);
+  steerFromX(event.clientX, event.clientY);
   try {
     steerPad.setPointerCapture(event.pointerId);
   } catch (error) {
@@ -1079,7 +1124,7 @@ steerPad.addEventListener('pointerdown', event => {
   }
 });
 steerPad.addEventListener('pointermove', event => {
-  if (event.pointerId === steerPointer) steerFromX(event.clientX);
+  if (event.pointerId === steerPointer) steerFromX(event.clientX, event.clientY);
 });
 steerPad.addEventListener('pointerup', releaseSteer);
 steerPad.addEventListener('pointercancel', releaseSteer);
@@ -4664,13 +4709,18 @@ function applyOptions() {
 // 画面の向き（縦/横）やiPhone/Androidの符号の違いに左右されない（どちらでも右に回すと＋になる）
 function onDeviceMotion(event) {
   const g = event.accelerationIncludingGravity;
+  tilt.motionEvents = (tilt.motionEvents || 0) + 1;
   if (!g || g.x === null || g.y === null || g.x === undefined) return;
+  tilt.motionValid = (tilt.motionValid || 0) + 1;
   tilt.motionAt = performance.now();
   applyGravity(g.x, g.y);
 }
 // 予備: 「向きのセンサー」（beta/gamma）から重力の向きを計算する。
 // アプリ内ブラウザなど、動きのセンサーが届かない環境向け（動きのセンサーが来ている間は使わない）
 function onDeviceOrientation(event) {
+  tilt.orientEvents = (tilt.orientEvents || 0) + 1;
+  tilt.lastBeta = event.beta;
+  tilt.lastGamma = event.gamma;
   if (event.beta === null || event.gamma === null || event.beta === undefined) return;
   if (performance.now() - (tilt.motionAt || -1e9) < 500) return;
   const b = event.beta * Math.PI / 180, g = event.gamma * Math.PI / 180;
@@ -4730,10 +4780,13 @@ function enableTilt() {
     asks.push(DeviceOrientationEvent.requestPermission());
   }
   if (!asks.length) {
+    tilt.permission = '不要（この端末は許可なしで使える）';
     begin();
     return;
   }
+  tilt.permission = '確認中…';
   Promise.allSettled(asks).then(results => {
+    tilt.permission = results.map(r => (r.status === 'fulfilled' ? r.value : `エラー: ${r.reason && r.reason.name}`)).join(' / ');
     if (results.some(r => r.status === 'fulfilled' && r.value === 'granted')) begin();
     else tiltFailed('傾きセンサーの使用が許可されませんでした。設定アプリ → Safari →「モーションと画面の向きのアクセス」をONにしてください');
   });
@@ -4810,6 +4863,7 @@ pauseOverlay.addEventListener('click', event => {
     showToast('今の持ち方を「まっすぐ」にしました', 'good', 1600);
   }
   if (action === 'fullscreen') toggleFullscreen();
+  if (action === 'flip') flipPortraitRotation();
   renderPauseButtons();
 });
 document.getElementById('pauseBtn').addEventListener('click', () => setPaused(true));
@@ -4835,6 +4889,52 @@ function toggleFullscreen() {
   }
 }
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
+// ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
+const APP_VERSION = '2026-11-22 v8';
+let tiltDiagTimer = null;
+function renderTiltDiag() {
+  const ua = navigator.userAgent;
+  const inApp = /Line\/|FBAN|FBAV|Instagram|Twitter|MicroMessenger|KAKAOTALK/i.test(ua);
+  const hasMotion = typeof DeviceMotionEvent !== 'undefined';
+  const hasOrient = typeof DeviceOrientationEvent !== 'undefined';
+  const needPerm = (hasMotion && typeof DeviceMotionEvent.requestPermission === 'function')
+    || (hasOrient && typeof DeviceOrientationEvent.requestPermission === 'function');
+  const fmt = v => (typeof v === 'number' ? v.toFixed(1) : String(v));
+  let verdict;
+  if (!window.isSecureContext) verdict = '× https で開いていません。https:// のURLで開いてください';
+  else if (inApp) verdict = '× アプリ内ブラウザです。Safari / Chrome で開き直してください';
+  else if (!hasMotion && !hasOrient) verdict = '× この端末・ブラウザは傾きセンサーに対応していません';
+  else if (tilt.permission && /denied|エラー/.test(tilt.permission)) verdict = '× 許可されていません。設定アプリ → Safari →「モーションと画面の向きのアクセス」をON → ページを再読み込み';
+  else if (!(tilt.motionEvents || tilt.orientEvents)) verdict = '… センサーの値を待っています（届かない場合はブラウザがブロックしています）';
+  else if (!tilt.supported) verdict = '△ センサーは反応していますが値が空です（この端末では使えない可能性）';
+  else verdict = '○ 正常です。スマホをハンドルのように左右に回すと下の％が変わります';
+  document.getElementById('tiltDiag').textContent = [
+    `バージョン: ${APP_VERSION}`,
+    `接続: ${window.isSecureContext ? 'https OK' : 'https ではない'}  /  ブラウザ: ${inApp ? 'アプリ内ブラウザ' : '通常'}`,
+    `センサー機能: 動き ${hasMotion ? 'あり' : 'なし'} / 向き ${hasOrient ? 'あり' : 'なし'} / 許可の確認 ${needPerm ? '必要' : '不要'}`,
+    `許可の結果: ${tilt.permission || '未確認'}`,
+    `動きセンサー: ${tilt.motionEvents || 0}回 受信（有効 ${tilt.motionValid || 0}）`,
+    `向きセンサー: ${tilt.orientEvents || 0}回 受信（前後 ${fmt(tilt.lastBeta)} / 左右 ${fmt(tilt.lastGamma)}）`,
+    `ハンドル: ${tilt.active ? `${tilt.value >= 0 ? '右' : '左'} ${Math.round(Math.abs(tilt.value) * 100)}%` : '傾き操作は OFF'}`,
+    `判定: ${verdict}`
+  ].join('\n');
+}
+document.getElementById('tiltTest').addEventListener('click', () => {
+  raceOptions.control = 'tilt';
+  writeStore('fzx-options', raceOptions);
+  enableTilt();   // ボタンを押したこの瞬間に許可を求める（iPhoneの決まり）
+  renderOptions();
+  clearInterval(tiltDiagTimer);
+  const until = performance.now() + 60000;
+  tiltDiagTimer = setInterval(() => {
+    updateTilt();
+    renderTiltDiag();
+    if (performance.now() > until) clearInterval(tiltDiagTimer);
+  }, 150);
+  renderTiltDiag();
+});
+
 // ③マシン画面の操作切り替え（タップした瞬間にセンサーの許可を求める）
 document.getElementById('controlToggle').addEventListener('click', () => {
   raceOptions.control = raceOptions.control === 'tilt' ? 'buttons' : 'tilt';

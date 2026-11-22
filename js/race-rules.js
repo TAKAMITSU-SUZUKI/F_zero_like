@@ -309,9 +309,6 @@ function awardPoints(playerPos, fieldCount, retired, gpFinalRank) {
   updatePointsBadges();
   return { items, total };
 }
-function canAffordUpgrade() {
-  return UPGRADES.some(def => upgradeLevel(def.key) < UPGRADE_MAX && progress.points >= UPGRADE_COSTS[upgradeLevel(def.key)]);
-}
 function showResults() {
   const retired = car.status === 'retired';
   const standings = raceMode === 'ta' ? [] : computeStandings();
@@ -363,7 +360,7 @@ function showResults() {
   const award = awardPoints(playerPos, standings.length, retired, gpFinalRank);
   const pointsHtml = `<div class="points-earned"><span class="total">+0 PT</span> 獲得（所持 ${progress.points} PT）
     <ul>${award.items.map(([label, pts]) => `<li>${label} +${pts}</li>`).join('')}</ul>
-    ${canAffordUpgrade() ? '<div class="hint">▶ メニューの「🔧 強化・色」でマシンを強化できます</div>' : ''}</div>`;
+    ${canBuyPart() ? '<div class="hint">▶ メニューの「🔧 パーツ・色」で新しいパーツを買えます</div>' : ''}</div>`;
 
   raceHud.card.innerHTML = `
     <div class="result-title ${retired ? 'bad' : ''}">${title}</div>

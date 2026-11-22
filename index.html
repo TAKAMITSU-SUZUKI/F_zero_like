@@ -23,12 +23,12 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
 <div id="wrap" class="selecting">
   <!-- 読み込みが終わり最初の画面が描けるまで覆っておく（途中の画面が見えないように） -->
-  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v11</div></div>
+  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v12</div></div>
   <canvas id="gl"></canvas>
   <canvas id="c" width="800" height="450"></canvas>
   <div id="hud">
@@ -124,13 +124,20 @@
           <div class="row-label">マシンを選んでください</div>
           <div class="machine-cards" id="machineCards"></div>
           <div class="step-extras">
-            <button type="button" class="small-btn" id="openGarage">🔧 強化・色 <span class="pts-badge" id="setupPoints"></span></button>
+            <button type="button" class="small-btn" id="openGarage">🔧 パーツ・色 <span class="pts-badge" id="setupPoints"></span></button>
             <button type="button" class="small-btn touch-only" id="controlToggle">🎮 操作: ボタン</button>
           </div>
         </div>
       </div>
       <div class="tab-panel side" data-panel="garage" hidden>
         <div class="panel-title">GARAGE <span id="garageMachineName"></span></div>
+        <!-- パーツ: ポイントで購入して装着。強いパーツほど負荷が大きく、積載量までしか付けられない -->
+        <div class="field">
+          <div class="upgrade-head"><span>パーツ（ポイントで購入・装着）</span><span class="pts-badge" id="garagePoints">0 PT</span></div>
+          <div class="part-help">パーツを押すと説明が出ます。強いパーツほど重く、マシンの積載量までしか付けられません</div>
+          <div id="partList"></div>
+          <button type="button" class="small-btn" id="partReset">パーツを全部売る（全額返還）</button>
+        </div>
         <div class="field"><label>ボディカラー</label><div class="swatches" id="bodySwatches"></div></div>
         <div class="field"><label>エンジンの光</label><div class="swatches" id="glowSwatches"></div></div>
         <div class="field">
@@ -139,11 +146,6 @@
           <div class="tune-preview" id="tunePreview"></div>
         </div>
         <button type="button" class="small-btn" id="garageReset">色・チューニングを初期状態に戻す</button>
-        <div class="field" style="margin-top:12px">
-          <div class="upgrade-head"><span>強化（全マシン共通）</span><span class="pts-badge" id="garagePoints">0 PT</span></div>
-          <div id="upgradeList"></div>
-          <button type="button" class="small-btn" id="upgradeReset">強化をリセット（ポイントを全額返還）</button>
-        </div>
       </div>
       <div class="tab-panel side wide" data-panel="editor" hidden>
         <div class="panel-title">COURSE EDIT <span class="sub">— 自分だけのコースを作る</span></div>
@@ -186,18 +188,18 @@
       <div class="select-desc" id="machineDesc"></div>
     </div>
     <div class="select-hint">← → : 選ぶ / Enter : 次へ / Esc : 戻る / M : BGM / N : 効果音</div>
-    <div class="version-tag">2026-11-22 v11</div>
+    <div class="version-tag">2026-11-22 v12</div>
   </div>
 </div>
 
-<script src="js/core.js?v=11"></script>
-<script src="js/audio.js?v=11"></script>
-<script src="js/race-rules.js?v=11"></script>
-<script src="js/setup.js?v=11"></script>
-<script src="js/race.js?v=11"></script>
-<script src="js/render2d.js?v=11"></script>
-<script src="js/custom.js?v=11"></script>
-<script src="js/main.js?v=11"></script>
-<script src="js/render3d.js?v=11"></script>
+<script src="js/core.js?v=12"></script>
+<script src="js/audio.js?v=12"></script>
+<script src="js/race-rules.js?v=12"></script>
+<script src="js/setup.js?v=12"></script>
+<script src="js/race.js?v=12"></script>
+<script src="js/render2d.js?v=12"></script>
+<script src="js/custom.js?v=12"></script>
+<script src="js/main.js?v=12"></script>
+<script src="js/render3d.js?v=12"></script>
 </body>
 </html>

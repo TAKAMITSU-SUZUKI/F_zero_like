@@ -218,7 +218,7 @@ function applyTrackZones(dt, now, m) {
     if (zone.type === 'slip') car.onSlip = true;
     if (zone.type === 'rough') {
       car.onRough = true;
-      car.speed *= Math.pow(0.988, dt);
+      car.speed *= Math.pow(1 - 0.012 * m.roughResist, dt);   // ジャイロで減速が半分
       applyDamage(0.04 * m.damage * dt, now, 'rough');
       car.shake = Math.max(car.shake, 1.2);
       if (Math.random() < 0.3 * dt) spawnSparks(W / 2 + (Math.random() - 0.5) * 80, H - 66, 1);
@@ -759,23 +759,24 @@ function update(dt, now) {
     car.boost = Math.max(0, car.boost - 1.4 * m.boostDrain * dt);
   } else if (gasOn) {
     car.speed += (maxSpeed - car.speed) * (1 - Math.pow(1 - 0.06 * m.accel, dt));
-    car.boost = Math.min(100, car.boost + 0.25 * dt);
+    car.boost = Math.min(100, car.boost + 0.25 * m.boostRegen * dt);
   } else {
     car.speed *= Math.pow(braking ? 0.94 : 0.97, dt);
-    car.boost = Math.min(100, car.boost + 0.4 * dt);
+    car.boost = Math.min(100, car.boost + 0.4 * m.boostRegen * dt);
   }
   car.dashTimer = Math.max(0, car.dashTimer - dt);
   car.wasBoosting = canBoost;
   if (canBoost && !wasBoosting) playCue('boost');
 
   // 操舵: 空中では効きが弱く、氷の上ではグリップが落ちて流れる
-  const grip = (air ? 0.3 : 1) * (car.onSlip ? 0.55 : 1);
+  // ウイング（空中の操作）・ウイングやジャイロ（氷上グリップ）で効きが良くなる
+  const grip = (air ? Math.min(1, 0.3 * m.airGrip) : 1) * (car.onSlip ? Math.min(1, 0.55 * m.iceGrip) : 1);
   car.tilt += (steer - car.tilt) * (1 - Math.pow(0.84, dt));
   car.slide += steer * (0.00012 + car.speed * 0.00001) * (drifting ? 1.6 : 1) * m.steer * grip * dt;
   car.slide *= Math.pow(car.onSlip ? (steer ? 0.985 : 0.975) : (steer ? 0.94 : 0.82), dt);
   if (!air) {
     const curvePull = curveCenterAt(car.dist + 120) - curveCenterAt(car.dist);
-    car.x -= curvePull * car.speed * 0.000012 * dt;
+    car.x -= curvePull * m.pull * car.speed * 0.000012 * dt;
   }
   car.x += (car.tilt * 0.009 * m.steer * grip * (0.4 + car.speed / 24) + car.slide) * dt;
   if (air) car.x = clamp(car.x, -1.6, 1.6);   // 空中ではガードレールを越えられる
@@ -790,7 +791,7 @@ function update(dt, now) {
     return;
   }
   if (!air && Math.abs(car.x) > 0.92 && !railOpenAt(car.dist, Math.sign(car.x))) {
-    car.speed *= Math.pow(0.94, dt);
+    car.speed *= Math.pow(1 - 0.06 * m.wallGuard, dt);
     if (car.driftCombo > 0) breakCombo('壁');
     applyDamage(0.03 * m.damage * (0.5 + car.speed / 15) * dt, now, 'wall');
     car.slide -= Math.sign(car.x) * 0.003 * dt;

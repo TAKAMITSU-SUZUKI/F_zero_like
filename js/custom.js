@@ -25,22 +25,29 @@ function effectiveMachine() {
   const base = currentMachine();
   const custom = machineCustom(base.id);
   const t = (custom.tune || 0) / 100;
-  const engine = upgradeLevel('engine'), armor = upgradeLevel('armor'), handling = upgradeLevel('handling');
+  // 付けているパーツの効果（倍率）を、マシン本来の性能に掛け合わせる
+  const parts = machineLoadout(base.id);
+  const p = partMods(parts);
   return {
     ...base,
-    // エンジン強化: 最高速・ブースト最高速・加速
-    top: base.top * (1 + 0.07 * t) * (1 + 0.025 * engine),
-    boostTop: base.boostTop * (1 + 0.04 * t) * (1 + 0.015 * engine),
-    accel: base.accel * (1 - 0.35 * t) * (1 + 0.06 * engine),
-    // ハンドリング強化: 旋回・ドリドリの伸び・切り返しの受付時間
-    steer: base.steer * raceOptions.steer * (1 + 0.05 * handling),
-    dori: base.dori * (1 + 0.08 * handling),
-    doriWindow: DORI_MAX_INTERVAL + 2 * handling,
-    // ボディ強化（体力）: 被ダメージ・接触での減速・PIT回復・エネルギー0から耐えられる量
-    damage: base.damage / (1 + 0.12 * armor),
-    impact: base.impact / (1 + 0.06 * armor),
-    pitRate: 1 + 0.12 * armor,
-    overloadLimit: OVERLOAD_LIMIT + armor,
+    top: base.top * (1 + 0.07 * t) * p.top,
+    boostTop: base.boostTop * (1 + 0.04 * t) * p.boostTop,
+    accel: base.accel * (1 - 0.35 * t) * p.accel,
+    boostDrain: base.boostDrain * p.boostDrain,
+    boostRegen: p.boostRegen,
+    steer: base.steer * raceOptions.steer * p.steer,
+    dori: base.dori * p.dori,
+    doriWindow: DORI_MAX_INTERVAL + p.doriWindow,
+    damage: base.damage * p.damage,
+    impact: base.impact * p.impact,
+    pitRate: p.pitRate,
+    overloadLimit: OVERLOAD_LIMIT + p.overload,
+    airGrip: p.airGrip,
+    iceGrip: p.iceGrip,
+    pull: p.pull,
+    wallGuard: p.wallGuard,
+    roughResist: p.roughResist,
+    parts,
     color: custom.color || base.color,
     glow: custom.glow || GLOW_COLORS[0]
   };
@@ -84,7 +91,7 @@ function renderGarage() {
   document.getElementById('tuneText').textContent = tune === 0 ? '標準' : (tune < 0 ? `加速重視 ${-tune}%` : `最高速重視 ${tune}%`);
   document.getElementById('tunePreview').textContent =
     `最高速 ${Math.round(15 * machineNow.top * 22)} km/h ／ ブースト ${Math.round(24 * machineNow.boostTop * 22)} km/h ／ 加速 ×${(machineNow.accel / base.accel).toFixed(2)}`;
-  renderUpgrades();
+  renderParts();
 }
 document.getElementById('tuneRange').addEventListener('input', event => saveGarage({ tune: Number(/** @type {HTMLInputElement} */ (event.target).value) }));
 document.getElementById('garageReset').addEventListener('click', () => {
@@ -95,72 +102,168 @@ document.getElementById('garageReset').addEventListener('click', () => {
   playCue('ui');
 });
 
-// ---- 強化（ポイントを使って段階的に強化。全マシン共通） ----
+// ---- パーツ（ポイントで購入してマシンに装着。持っているパーツは全マシン共通で使える） ----
+let garageSel = null;   // 説明を表示中のパーツ { slot, id }
+function canBuyPart() {
+  return PARTS.some(part => !progress.owned.includes(part.id) && progress.points >= part.price);
+}
 function updatePointsBadges() {
   const garagePoints = document.getElementById('garagePoints');
   const setupPoints = document.getElementById('setupPoints');
   if (garagePoints) garagePoints.textContent = `${progress.points} PT`;
-  if (setupPoints) setupPoints.textContent = `${progress.points}PT${canAffordUpgrade() ? ' ▲' : ''}`;
+  if (setupPoints) setupPoints.textContent = `${progress.points}PT${canBuyPart() ? ' ▲' : ''}`;
 }
-function renderUpgrades(flashKey) {
+// 性能の変化を「+5%」のように表示する（2つ目が true の項目は、数字が小さいほど良い）
+const MOD_LABELS = {
+  top: ['最高速'], accel: ['加速'], boostTop: ['ブースト速度'], boostDrain: ['ブースト消費', true], boostRegen: ['ブースト回復'],
+  steer: ['旋回'], dori: ['ドリドリの伸び'], damage: ['被ダメージ', true], impact: ['接触の衝撃', true], pitRate: ['PIT回復'],
+  airGrip: ['空中の操作'], iceGrip: ['氷上グリップ'], pull: ['カーブで流される量', true], wallGuard: ['壁での減速', true],
+  roughResist: ['荒れ地での減速', true]
+};
+function describeMods(mods) {
+  return Object.entries(mods).map(([key, value]) => {
+    if (key === 'overload') return `<span class="up">エネルギー0の粘り +${value}</span>`;
+    if (key === 'doriWindow') return `<span class="up">切り返しの猶予 +${value}</span>`;
+    const [label, lower] = MOD_LABELS[key] || [key];
+    const pct = Math.round((value - 1) * 100);
+    const good = lower ? pct < 0 : pct > 0;
+    return `<span class="${good ? 'up' : 'down'}">${label} ${pct > 0 ? '+' : ''}${pct}%</span>`;
+  }).join(' ');
+}
+// パーツを付けたことによる総合的な変化（パーツなしと比べて）
+function statSummary(mods) {
+  const stats = [
+    ['最高速', mods.top], ['加速', mods.accel], ['ブースト', mods.boostTop], ['燃費', 1 / mods.boostDrain],
+    ['旋回', mods.steer], ['安定', 1 / mods.pull], ['耐久', 1 / mods.damage]
+  ];
+  const box = makeEl('div', 'stat-chips');
+  stats.forEach(([label, value]) => {
+    const pct = Math.round((value - 1) * 100);
+    box.appendChild(makeEl('span', pct > 0 ? 'up' : (pct < 0 ? 'down' : ''), `${label} ${pct > 0 ? '+' : ''}${pct}%`));
+  });
+  return box;
+}
+function renderParts(flashSlot) {
   updatePointsBadges();
-  const list = document.getElementById('upgradeList');
+  const base = currentMachine();
+  const loadout = machineLoadout(base.id);
+  const cap = MACHINE_CAPACITY[base.id] || 9;
+  const used = loadoutLoad(loadout);
+  const list = document.getElementById('partList');
   list.innerHTML = '';
-  UPGRADES.forEach(def => {
-    const lv = upgradeLevel(def.key);
-    const cost = lv < UPGRADE_MAX ? UPGRADE_COSTS[lv] : null;
-    const row = makeEl('div', `upgrade-row${def.key === flashKey ? ' flash' : ''}`);
-    const name = makeEl('div', 'upgrade-name', `${def.name}  Lv.${lv}`);
-    const pips = makeEl('span', 'upgrade-pips');
-    for (let i = 0; i < UPGRADE_MAX; i++) pips.appendChild(makeEl('b', i < lv ? 'on' : ''));
-    name.appendChild(pips);
-    const button = makeEl('button', 'small-btn primary', cost === null ? 'MAX' : `強化 ${cost}pt`);
-    button.type = 'button';
-    button.disabled = cost === null || progress.points < cost;
-    if (cost !== null && progress.points < cost) button.textContent = `あと${cost - progress.points}pt`;
-    button.addEventListener('click', () => buyUpgrade(def.key));
-    const now = makeEl('div', 'upgrade-effect', lv ? `現在: ${def.effect(lv)}` : '現在: 未強化');
-    const next = makeEl('div', 'upgrade-effect next', cost !== null ? `次: ${def.effect(lv + 1)}` : '最大まで強化済み');
-    row.append(name, button, now, next);
+  const meter = makeEl('div', `load-meter${used >= cap ? ' full' : ''}`);
+  meter.innerHTML = `<span>積載 <b>${used}</b> / ${cap}（${escapeHtml(base.name)}）</span><i><em style="width:${clamp(used / cap, 0, 1) * 100}%"></em></i>`;
+  list.appendChild(meter);
+  PART_SLOTS.forEach(slot => {
+    const row = makeEl('div', `part-slot${slot.key === flashSlot ? ' flash' : ''}`);
+    row.appendChild(makeEl('div', 'part-slot-name', slot.name));
+    const choices = makeEl('div', 'choice-row part-choices');
+    [null, ...PARTS.filter(part => part.slot === slot.key)].forEach(part => {
+      const id = part ? part.id : null;
+      const equipped = (loadout[slot.key] || null) === id;
+      const owned = !part || progress.owned.includes(part.id);
+      const selected = Boolean(garageSel) && garageSel.slot === slot.key && garageSel.id === id;
+      const button = makeEl('button', [equipped ? 'active' : '', owned ? '' : 'locked', selected ? 'sel' : ''].join(' ').trim());
+      button.type = 'button';
+      button.innerHTML = part
+        ? `${escapeHtml(part.name)}<small>${owned ? `負荷 ${part.load}` : `🔒 ${part.price}pt`}</small>`
+        : 'なし<small>標準</small>';
+      button.addEventListener('click', () => {
+        garageSel = selected ? null : { slot: slot.key, id };
+        playCue('ui');
+        renderParts();
+      });
+      choices.appendChild(button);
+    });
+    row.appendChild(choices);
+    if (garageSel && garageSel.slot === slot.key) row.appendChild(partDetail(slot.key, garageSel.id, loadout, cap, used));
     list.appendChild(row);
   });
-  const refund = UPGRADES.reduce((sum, def) => sum + upgradeRefund(upgradeLevel(def.key)), 0);
-  const resetButton = /** @type {HTMLButtonElement} */ (document.getElementById('upgradeReset'));
+  list.appendChild(statSummary(partMods(loadout)));
+  const refund = progress.owned.reduce((sum, id) => sum + partById(id).price, 0);
+  const resetButton = /** @type {HTMLButtonElement} */ (document.getElementById('partReset'));
   resetButton.disabled = refund === 0;
-  resetButton.textContent = refund ? `強化をリセット（${refund}pt 返還）` : '強化をリセット（未強化）';
+  resetButton.textContent = refund ? `パーツを全部売る（${refund}pt 返還）` : 'パーツを全部売る（未購入）';
   delete resetButton.dataset.armed;
 }
-function buyUpgrade(key) {
-  const def = UPGRADES.find(item => item.key === key);
-  const lv = upgradeLevel(key);
-  if (lv >= UPGRADE_MAX) return;
-  const cost = UPGRADE_COSTS[lv];
-  if (progress.points < cost) {
+// 選んだパーツの説明と、購入・装着ボタン
+function partDetail(slotKey, id, loadout, cap, used) {
+  const part = id ? partById(id) : null;
+  const current = loadout[slotKey] ? partById(loadout[slotKey]) : null;
+  const usedAfter = used - (current ? current.load : 0) + (part ? part.load : 0);
+  const owned = !part || progress.owned.includes(part.id);
+  const equipped = (loadout[slotKey] || null) === id;
+  const box = makeEl('div', 'part-detail');
+  box.appendChild(makeEl('div', 'part-desc', part ? `${part.name}（負荷 ${part.load}）: ${part.desc}` : '何も付けない（標準の性能）'));
+  if (part) {
+    const effect = makeEl('div', 'part-effect');
+    effect.innerHTML = describeMods(part.mods);
+    box.appendChild(effect);
+  }
+  const action = /** @type {HTMLButtonElement} */ (makeEl('button', 'small-btn primary'));
+  action.type = 'button';
+  if (equipped) {
+    action.textContent = id ? '装着中' : '何も付けていません';
+    action.disabled = true;
+  } else if (usedAfter > cap) {
+    action.textContent = `積載オーバー（${usedAfter} / ${cap}）。他のパーツを外してください`;
+    action.disabled = true;
+  } else if (!owned) {
+    action.textContent = progress.points >= part.price ? `${part.price}pt で購入して装着` : `ポイント不足（あと ${part.price - progress.points}pt）`;
+    action.disabled = progress.points < part.price;
+  } else {
+    action.textContent = id ? '装着する' : '外す';
+  }
+  action.addEventListener('click', () => equipPart(slotKey, id));
+  box.appendChild(action);
+  return box;
+}
+function equipPart(slotKey, id) {
+  const base = currentMachine();
+  const part = id ? partById(id) : null;
+  const loadout = machineLoadout(base.id);
+  const current = loadout[slotKey] ? partById(loadout[slotKey]) : null;
+  const cap = MACHINE_CAPACITY[base.id] || 9;
+  if (loadoutLoad(loadout) - (current ? current.load : 0) + (part ? part.load : 0) > cap) {
     playCue('deny');
     return;
   }
-  progress.points -= cost;
-  progress.upgrades[key] = lv + 1;
+  let bought = false;
+  if (part && !progress.owned.includes(part.id)) {
+    if (progress.points < part.price) {
+      playCue('deny');
+      return;
+    }
+    progress.points -= part.price;
+    progress.owned.push(part.id);
+    bought = true;
+  }
+  if (part) loadout[slotKey] = part.id;
+  else delete loadout[slotKey];
+  progress.loadouts[base.id] = loadout;
   saveProgress();
-  playCue('upgrade');
+  playCue(bought ? 'upgrade' : 'ok');
+  if (window.setHeroMachine) window.setHeroMachine(effectiveMachine());
   renderGarage();
-  renderUpgrades(key);
+  renderParts(slotKey);
 }
-// リセットは誤操作を防ぐため2回押しで実行（確認ダイアログが出ないアプリ内ブラウザでも動く）
-document.getElementById('upgradeReset').addEventListener('click', event => {
+// 全部売る（買った値段を全額返す）。誤操作を防ぐため2回押しで実行
+document.getElementById('partReset').addEventListener('click', event => {
   const button = /** @type {HTMLButtonElement} */ (event.currentTarget);
   if (!button.dataset.armed) {
     button.dataset.armed = '1';
-    button.textContent = 'もう一度押すとリセットします';
+    button.textContent = 'もう一度押すと全部売ります';
     playCue('ui');
-    setTimeout(() => { if (button.dataset.armed) renderUpgrades(); }, 3000);
+    setTimeout(() => { if (button.dataset.armed) renderParts(); }, 3000);
     return;
   }
-  const refund = UPGRADES.reduce((sum, def) => sum + upgradeRefund(upgradeLevel(def.key)), 0);
-  progress.points += refund;
-  progress.upgrades = {};
+  progress.points += progress.owned.reduce((sum, id) => sum + partById(id).price, 0);
+  progress.owned = [];
+  progress.loadouts = {};
+  garageSel = null;
   saveProgress();
   playCue('points');
+  if (window.setHeroMachine) window.setHeroMachine(effectiveMachine());
   renderGarage();
 });
 
@@ -447,7 +550,7 @@ function toggleFullscreen() {
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
 // ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
-const APP_VERSION = '2026-11-22 v11';
+const APP_VERSION = '2026-11-22 v12';
 let tiltDiagTimer = null;
 function renderTiltDiag() {
   const ua = navigator.userAgent;

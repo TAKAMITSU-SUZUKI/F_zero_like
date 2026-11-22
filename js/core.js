@@ -218,20 +218,102 @@ const raceOptions = readStore('fzx-options', {
 if (raceOptions.tiltRange === 22) raceOptions.tiltRange = 14;
 // ガレージ: マシンごとの色・エンジンの光・チューニング
 const garage = readStore('fzx-garage', {});
-// ===== ポイントと強化（全マシン共通。ブラウザに保存） =====
-// レースの順位・K.O.・ドリドリ・タイムアタックの目標タイムなどでポイントを獲得し、強化に使う
-const UPGRADE_MAX = 5;
-const UPGRADE_COSTS = [120, 200, 320, 480, 700];   // Lv.0→1, 1→2, … に必要なポイント
-const UPGRADES = [
-  { key: 'engine', name: '⚙ エンジン', effect: lv => `最高速 +${(lv * 2.5).toFixed(1)}% / ブースト最高速 +${(lv * 1.5).toFixed(1)}% / 加速 +${lv * 6}%` },
-  { key: 'armor', name: '🛡 ボディ強度（体力）', effect: lv => `被ダメージ -${Math.round((1 - 1 / (1 + 0.12 * lv)) * 100)}% / 接触の減速 -${Math.round((1 - 1 / (1 + 0.06 * lv)) * 100)}% / PIT回復 +${lv * 12}% / 限界 +${lv}` },
-  { key: 'handling', name: '🎯 ハンドリング', effect: lv => `旋回 +${lv * 5}% / ドリドリの伸び +${lv * 8}% / 切り返しの猶予 +${lv * 2}` }
+// ===== ポイントとパーツ（ブラウザに保存） =====
+// レースでポイントを獲得 → ガレージでパーツを買ってマシンに装着する。
+// ・どのパーツにも長所と短所がある（速くなるが壊れやすい、安定するが最高速が落ちる など）
+// ・マシンごとに「積載量」の上限があり、強いパーツほど負荷が大きいので全部は付けられない
+//   → ポイントを貯めても無制限には速くならず、組み合わせの工夫が必要になる
+const PART_SLOTS = [
+  { key: 'engine', name: '⚙ エンジン' },
+  { key: 'booster', name: '🔥 ブースター' },
+  { key: 'wing', name: '🪽 ウイング' },
+  { key: 'stabilizer', name: '⚓ スタビライザー' },
+  { key: 'armor', name: '🛡 装甲' }
 ];
-const progress = readStore('fzx-progress', { points: 0, upgrades: {} });
+// mods: 性能の倍率（overload・doriWindow だけは足し算）
+//  top 最高速 / accel 加速 / boostTop ブースト速度 / boostDrain ブースト消費 / boostRegen ブースト回復
+//  steer 旋回 / dori ドリドリの伸び / doriWindow 切り返しの猶予 / damage 被ダメージ / impact 接触の衝撃
+//  pitRate PIT回復 / overload エネルギー0から耐えられる量 / airGrip 空中の操作 / iceGrip 氷上のグリップ
+//  pull カーブで外へ流される量 / wallGuard 壁での減速 / roughResist 荒れ地での減速
+const PARTS = [
+  { id: 'e_turbo', slot: 'engine', name: 'ターボ', price: 250, load: 2,
+    desc: '低速からの立ち上がりが鋭くなる。接触や地雷からの復帰が速い。', mods: { accel: 1.18, top: 1.01 } },
+  { id: 'e_high', slot: 'engine', name: 'ハイパワー', price: 400, load: 3,
+    desc: '最高速と加速がバランスよく上がるが、熱を持つぶん壊れやすい。', mods: { top: 1.05, accel: 1.05, damage: 1.12 } },
+  { id: 'e_v12', slot: 'engine', name: 'レース用V12', price: 650, load: 5,
+    desc: '最高速は最強。ただし重くて加速が鈍り、ブーストの消費も増える。', mods: { top: 1.09, accel: 0.9, boostDrain: 1.15 } },
+  { id: 'b_big', slot: 'booster', name: '大型ブースター', price: 300, load: 3,
+    desc: 'ブースト中の速度が上がるが、ブーストを早く使い切る。', mods: { boostTop: 1.06, boostDrain: 1.3 } },
+  { id: 'b_eco', slot: 'booster', name: '省エネノズル', price: 250, load: 1,
+    desc: 'ブーストが長持ちする。速度はわずかに落ちる。', mods: { boostDrain: 0.72, boostTop: 0.98 } },
+  { id: 'b_charge', slot: 'booster', name: '急速チャージャー', price: 350, load: 2,
+    desc: 'ブーストゲージの回復が速い。こまめに使う人向け。', mods: { boostRegen: 1.5 } },
+  { id: 'w_down', slot: 'wing', name: 'ダウンフォース', price: 250, load: 2,
+    desc: '大きなリアウイング。カーブで外へ流されにくく氷にも強いが、空気抵抗で最高速が少し落ちる。', mods: { pull: 0.72, iceGrip: 1.3, steer: 1.05, top: 0.98 } },
+  { id: 'w_glide', slot: 'wing', name: 'グライダー', price: 300, load: 2,
+    desc: '左右に広い翼。ジャンプ中でもよく曲がれ、崖ジャンプの着地を狙いやすい。', mods: { airGrip: 2.5, top: 0.99 } },
+  { id: 'w_aero', slot: 'wing', name: 'エアロフィン', price: 350, load: 1,
+    desc: '空気抵抗を減らして最高速アップ。そのぶん曲がりにくく、カーブで流されやすい。', mods: { top: 1.03, steer: 0.94, pull: 1.12 } },
+  { id: 's_side', slot: 'stabilizer', name: 'サイドスタビ', price: 250, load: 2,
+    desc: '横の安定板。体当たりされても弾かれにくく、壁に擦っても減速しにくい。ドリドリは少し伸びにくい。', mods: { impact: 0.75, wallGuard: 0.6, dori: 0.9 } },
+  { id: 's_gyro', slot: 'stabilizer', name: 'ジャイロ', price: 350, load: 2,
+    desc: '姿勢を自動で保つ装置。氷・荒れ地・カーブに強くなるが、ハンドルの反応が少し鈍る。', mods: { iceGrip: 1.5, roughResist: 0.5, pull: 0.85, steer: 0.96 } },
+  { id: 's_drift', slot: 'stabilizer', name: 'ドリフトフィン', price: 300, load: 2,
+    desc: 'ドリドリ専用。伸びが大きく切り返しの猶予も長いが、車体が不安定になる。', mods: { dori: 1.2, doriWindow: 4, pull: 1.1 } },
+  { id: 'a_light', slot: 'armor', name: '軽量フレーム', price: 200, load: -2,
+    desc: '装甲を削って軽くする。加速が上がり積載にも余裕ができるが、ダメージに弱い。', mods: { accel: 1.1, damage: 1.3 } },
+  { id: 'a_heavy', slot: 'armor', name: '重装甲', price: 350, load: 3,
+    desc: '分厚い装甲。ダメージと接触に強いが、重くて加速が落ちる。', mods: { damage: 0.75, impact: 0.8, accel: 0.92 } },
+  { id: 'a_shield', slot: 'armor', name: 'シールド', price: 450, load: 3,
+    desc: 'エネルギーの防御膜。PITでの回復が速く、エネルギー0でも粘れる。', mods: { pitRate: 1.35, overload: 3, damage: 0.9 } }
+];
+const MACHINE_CAPACITY = { comet: 9, bike: 7, titan: 11, needle: 8 };   // 積載量（マシンごと）
+const PART_MOD_DEFAULTS = {
+  top: 1, accel: 1, boostTop: 1, boostDrain: 1, boostRegen: 1, steer: 1, dori: 1, damage: 1, impact: 1,
+  pitRate: 1, airGrip: 1, iceGrip: 1, pull: 1, wallGuard: 1, roughResist: 1, overload: 0, doriWindow: 0
+};
+const ADDITIVE_MODS = ['overload', 'doriWindow'];
+const partById = id => PARTS.find(part => part.id === id) || null;
+const progress = readStore('fzx-progress', { points: 0, owned: [], loadouts: {} });
 progress.points = Math.max(0, Math.floor(Number(progress.points) || 0));
-if (!progress.upgrades || typeof progress.upgrades !== 'object') progress.upgrades = {};
-const upgradeLevel = key => clamp(Math.floor(Number(progress.upgrades[key]) || 0), 0, UPGRADE_MAX);
-const upgradeRefund = level => UPGRADE_COSTS.slice(0, level).reduce((sum, cost) => sum + cost, 0);
+if (!Array.isArray(progress.owned)) progress.owned = [];
+progress.owned = progress.owned.filter(id => partById(id));
+if (!progress.loadouts || typeof progress.loadouts !== 'object') progress.loadouts = {};
+// 以前の段階強化（Lv制）は廃止。使ったポイントは全額返す
+if (progress.upgrades && typeof progress.upgrades === 'object') {
+  const OLD_COSTS = [120, 200, 320, 480, 700];
+  Object.values(progress.upgrades).forEach(level => {
+    const lv = Math.max(0, Math.min(5, Math.floor(Number(level) || 0)));
+    progress.points += OLD_COSTS.slice(0, lv).reduce((sum, cost) => sum + cost, 0);
+  });
+  delete progress.upgrades;
+  saveProgress();
+}
+// マシンに付けているパーツ（持っていない・場所違いのパーツは外して読む）
+function machineLoadout(machineId) {
+  const saved = progress.loadouts[machineId] || {};
+  const loadout = {};
+  PART_SLOTS.forEach(slot => {
+    const part = partById(saved[slot.key]);
+    if (part && part.slot === slot.key && progress.owned.includes(part.id)) loadout[slot.key] = part.id;
+  });
+  return loadout;
+}
+function loadoutLoad(loadout) {
+  return Object.values(loadout).reduce((sum, id) => sum + (partById(id) ? partById(id).load : 0), 0);
+}
+function partMods(loadout) {
+  const mods = { ...PART_MOD_DEFAULTS };
+  Object.values(loadout).forEach(id => {
+    const part = partById(id);
+    if (!part) return;
+    Object.entries(part.mods).forEach(([key, value]) => {
+      if (ADDITIVE_MODS.includes(key)) mods[key] += value;
+      else mods[key] *= value;
+    });
+  });
+  return mods;
+}
 function saveProgress() {
   writeStore('fzx-progress', progress);
 }

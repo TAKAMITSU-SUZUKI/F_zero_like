@@ -909,7 +909,82 @@
     const shadow = new THREE.Mesh(shadowGeo, shadowMat);
     shadow.scale.set(dims.shadow[0], 1, dims.shadow[1]);
     scene.add(root, shadow);
-    return { root, body, flames, glows, shadow, paint, glass };
+    return { root, body, flames, glows, shadow, paint, glass, dims };
+  }
+
+  // ---- 装着したパーツを機体に付ける（つぶした楕円体で作るので角がなく、処理も軽い） ----
+  // 機体の大きさは影の大きさ（dims.shadow = [半分の幅, 半分の長さ]）を目安にする。後ろが +z
+  function addPartVisuals(ship, parts) {
+    const body = ship.body, paint = ship.paint;
+    const halfW = ship.dims.shadow[0], halfL = ship.dims.shadow[1];
+    const rear = halfL * 0.72;
+    // 楕円体（幅・高さ・奥行きは直径で指定）
+    const blob = (mat, w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => {
+      const mesh = part(body, canopyGeo, mat, x, y, z, w / 2, h / 2, d / 2, rx, ry, rz);
+      mesh.castShadow = true;
+      return mesh;
+    };
+    const both = fn => { fn(-1); fn(1); };
+    switch (parts.wing) {
+      case 'w_down':   // 大きなリアウイング（支柱2本＋左右の翼端板）
+        blob(paint, halfW * 1.7, 0.5, 3.4, 0, 7.2, rear - 1, -0.22);
+        both(s => blob(darkMat, 0.7, 4, 1.2, s * halfW * 0.35, 5.3, rear - 1));
+        both(s => blob(darkMat, 0.4, 2.6, 3.6, s * halfW * 0.85, 7.2, rear - 1));
+        break;
+      case 'w_glide':  // 左右に広い翼（少し上反り）
+        both(s => blob(paint, halfW * 1.3, 0.35, 8, s * halfW * 1.05, 2.4, 1, 0, 0, s * 0.12));
+        both(s => blob(metalMat, 0.4, 1.6, 2.4, s * halfW * 1.7, 3.0, 2.5));
+        break;
+      case 'w_aero':   // 小さな垂直フィン2枚
+        both(s => blob(paint, 0.4, 3.2, 4.2, s * halfW * 0.45, 5.2, rear - 3, 0, 0, s * 0.25));
+        break;
+      default: break;
+    }
+    switch (parts.stabilizer) {
+      case 's_side':   // 側面の安定板
+        both(s => blob(metalMat, 0.5, 2.8, halfL * 0.75, s * halfW * 1.02, 1.6, rear * 0.3));
+        break;
+      case 's_gyro': { // 機体の上に浮かぶリング
+        const ring = part(body, ringGeo, metalMat, 0, 6.2, 0, halfW * 0.35, halfW * 0.35, halfW * 0.35, Math.PI / 2);
+        ring.userData.spin = true;
+        break;
+      }
+      case 's_drift':  // 後ろ下の斜めフィン
+        both(s => blob(paint, 0.4, 2.6, 3.4, s * halfW * 0.7, 1.2, rear, 0, 0, s * 0.6));
+        break;
+      default: break;
+    }
+    switch (parts.armor) {
+      case 'a_heavy':  // 側面の装甲板
+        both(s => blob(darkMat, 1.2, 2.6, halfL * 1.1, s * halfW * 0.92, 2.6, 0));
+        break;
+      case 'a_shield': {   // うっすら光る防御膜
+        const shield = new THREE.Mesh(canopyGeo, new THREE.MeshBasicMaterial({
+          color: 0x67e8f9, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false
+        }));
+        shield.scale.set(halfW * 1.15, 5, halfL * 1.15);
+        shield.position.y = 2.5;
+        body.add(shield);
+        break;
+      }
+      default: break;
+    }
+    switch (parts.engine) {
+      case 'e_turbo':  // 屋根の吸気口
+        blob(metalMat, 2.2, 1.4, 4, 0, 5.4, 2);
+        break;
+      case 'e_high':
+        both(s => blob(metalMat, 1.6, 1.2, 4, s * 2, 5.0, 3));
+        break;
+      case 'e_v12':    // 大きな吸気口と排気管
+        blob(darkMat, 3.2, 2.0, 6, 0, 5.8, 2);
+        both(s => blob(metalMat, 0.9, 0.9, 5, s * 2.6, 2.4, rear + 1));
+        break;
+      default: break;
+    }
+    // ブースターは炎・光の大きさで表す
+    const glowScale = parts.booster === 'b_big' ? 1.4 : (parts.booster === 'b_eco' ? 0.8 : 1);
+    ship.glows.forEach(glow => { glow.userData.k *= glowScale; });
   }
   function removeShip(ship) {
     scene.remove(ship.root, ship.shadow);
@@ -921,6 +996,7 @@
   // 自機は半透明にできるよう、共有マテリアルを複製して専用にする
   function makeHero(machineDef) {
     const ship = makeShip(machineDef.id, new THREE.Color(machineDef.color).getHex(), true);
+    addPartVisuals(ship, machineDef.parts || {});
     ship.fadeMats = [];
     ship.opacity = 1;
     ship.root.traverse(obj => {
@@ -1112,6 +1188,9 @@
           3.2 + airHeightAt(ghostState.dist), now);
       }
     }
+    hero.body.children.forEach(child => {
+      if (child.userData.spin) child.rotation.z = now * 0.004;   // ジャイロのリングを回す
+    });
     hero.flames.forEach(flame => {
       flame.visible = boosting;
       flame.scale.set(1, 1, 0.8 + Math.random() * 0.7);

@@ -596,26 +596,35 @@ canvas { width: 100%; height: 100%; display: block; }
   #backBtn, #startBtn { padding: 9px 14px; font-size: 13px; }
   .select-desc { font-size: 10px; padding-right: 200px; }
 }
-/* ===== ポイントと強化（アップグレード） ===== */
+/* ===== ポイントとパーツ ===== */
 .pts-badge { color: #fde047; font-weight: 900; font-variant-numeric: tabular-nums; }
 .upgrade-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; font-weight: 800; color: #e2e8f0; }
 .upgrade-head .pts-badge { font-size: 15px; }
-.upgrade-row {
-  display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; align-items: center; padding: 6px 8px; margin-bottom: 6px;
-  border-radius: 9px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.25);
-}
-.upgrade-row > div { grid-column: 1; }
-.upgrade-row > button { grid-column: 2; grid-row: 1 / span 3; min-width: 86px; }
-.upgrade-row > button:disabled { opacity: 0.4; cursor: default; }
-.upgrade-name { font-size: 12px; font-weight: 900; color: #e0f2fe; }
-.upgrade-pips { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
-.upgrade-pips b { width: 12px; height: 6px; border-radius: 2px; background: rgba(148, 163, 184, 0.25); }
-.upgrade-pips b.on { background: #fde047; box-shadow: 0 0 6px #facc15; }
-.upgrade-effect { font-size: 10px; color: #94a3b8; }
-.upgrade-effect.next { color: #a5f3fc; }
-.upgrade-row.flash { animation: upgradeFlash 700ms ease-out; }
+/* パーツ */
+.part-help { font-size: 10px; color: #94a3b8; margin-bottom: 6px; }
+.load-meter { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; color: #cbd5e1; }
+.load-meter b { color: #fde047; font-size: 13px; }
+.load-meter i { flex: 1; height: 6px; border-radius: 3px; background: rgba(148, 163, 184, 0.25); overflow: hidden; }
+.load-meter em { display: block; height: 100%; background: linear-gradient(90deg, #22d3ee, #fde047); }
+.load-meter.full em { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+.part-slot { padding: 5px 7px; margin-bottom: 5px; border-radius: 9px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.25); }
+.part-slot.flash { animation: upgradeFlash 700ms ease-out; }
+.part-slot-name { font-size: 11px; font-weight: 900; color: #e0f2fe; margin-bottom: 4px; }
+.part-choices button { padding: 5px 4px; line-height: 1.25; }
+.part-choices button small { display: block; font-size: 9px; font-weight: 600; color: #94a3b8; }
+.part-choices button.active small { color: #a5f3fc; }
+.part-choices button.locked { color: #64748b; border-style: dashed; }
+.part-choices button.sel { outline: 2px solid #fde047; outline-offset: 1px; }
+.part-detail { margin-top: 5px; padding: 6px 8px; border-radius: 8px; background: rgba(2, 6, 23, 0.7); border: 1px solid rgba(250, 204, 21, 0.4); }
+.part-desc { font-size: 11px; color: #e2e8f0; line-height: 1.5; }
+.part-effect { margin: 3px 0 6px; font-size: 10px; display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.part-effect .up, .stat-chips .up { color: #4ade80; }
+.part-effect .down, .stat-chips .down { color: #f87171; }
+.part-detail button { width: 100%; }
+.part-detail button:disabled { opacity: 0.5; cursor: default; }
+.stat-chips { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 4px 0 8px; font-size: 11px; font-weight: 800; color: #cbd5e1; }
 @keyframes upgradeFlash {
-  30% { border-color: #fde047; box-shadow: 0 0 18px rgba(250, 204, 21, 0.9); transform: scale(1.03); }
+  30% { border-color: #fde047; box-shadow: 0 0 18px rgba(250, 204, 21, 0.9); transform: scale(1.02); }
   100% { box-shadow: none; transform: none; }
 }
 .points-earned {
@@ -629,5 +638,5 @@ canvas { width: 100%; height: 100%; display: block; }
 @media (max-height: 520px), (max-width: 520px) and (orientation: portrait) {
   .points-earned { margin-top: 5px; padding: 4px 8px; font-size: 10px; }
   .points-earned .total { font-size: 14px; }
-  .upgrade-row { padding: 4px 6px; margin-bottom: 4px; }
+  .part-slot { padding: 4px 6px; margin-bottom: 4px; }
 }

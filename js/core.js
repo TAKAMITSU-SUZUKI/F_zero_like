@@ -193,6 +193,9 @@ resizeCanvas();
 const keys = { left: false, right: false, gas: false, boost: false, drift: false };
 
 // ===== ユーザー設定（ブラウザに保存） =====
+// Brave ブラウザ（シールド機能が傾きセンサーや対戦の通信を止めることがあるので、案内を出し分ける）
+const IS_BRAVE = Boolean(/** @type {any} */ (navigator).brave);
+const BRAVE_SHIELD_HINT = 'Braveをお使いの場合は、アドレスバーのライオン🦁を押してこのサイトの「シールド」をオフにし、ページを読み込み直してください';
 const IS_TOUCH = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
 function readStore(key, fallback) {
   try {

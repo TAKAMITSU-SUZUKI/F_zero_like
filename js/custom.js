@@ -428,7 +428,9 @@ function enableTilt() {
     applyOptions();
     setTimeout(() => {
       if (tilt.active && !tilt.supported) {
-        tiltFailed('傾きセンサーの値が届きません。LINEなどのアプリ内ブラウザでは使えないことがあるので、Safari / Chrome で開いてください（ボタン操作に切り替えます）');
+        tiltFailed(IS_BRAVE
+          ? `傾きセンサーの値が届きません。${BRAVE_SHIELD_HINT}（ボタン操作に切り替えます）`
+          : '傾きセンサーの値が届きません。LINEなどのアプリ内ブラウザでは使えないことがあるので、Safari / Chrome で開いてください（ボタン操作に切り替えます）');
       }
     }, 2500);
   };
@@ -564,7 +566,7 @@ function toggleFullscreen() {
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
 // ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
-const APP_VERSION = '2026-11-22 v15';
+const APP_VERSION = '2026-11-22 v16';
 let tiltDiagTimer = null;
 function renderTiltDiag() {
   const ua = navigator.userAgent;
@@ -579,12 +581,14 @@ function renderTiltDiag() {
   else if (inApp) verdict = '× アプリ内ブラウザです。Safari / Chrome で開き直してください';
   else if (!hasMotion && !hasOrient) verdict = '× この端末・ブラウザは傾きセンサーに対応していません';
   else if (tilt.permission && /denied|エラー/.test(tilt.permission)) verdict = '× 拒否されています。Safariを完全に終了して開き直し、このボタンを押して出る確認で「許可」を選んでください（以前「許可しない」を選ぶと、確認が出ずに拒否されます）';
-  else if (!(tilt.motionEvents || tilt.orientEvents)) verdict = '… センサーの値を待っています（届かない場合はブラウザがブロックしています）';
+  else if (!(tilt.motionEvents || tilt.orientEvents)) verdict = IS_BRAVE
+    ? `… センサーの値を待っています。届かない場合: ${BRAVE_SHIELD_HINT}`
+    : '… センサーの値を待っています（届かない場合はブラウザがブロックしています）';
   else if (!tilt.supported) verdict = '△ センサーは反応していますが値が空です（この端末では使えない可能性）';
   else verdict = '○ 正常です。スマホをハンドルのように左右に回すと下の％が変わります';
   document.getElementById('tiltDiag').textContent = [
     `バージョン: ${APP_VERSION}`,
-    `接続: ${window.isSecureContext ? 'https OK' : 'https ではない'}  /  ブラウザ: ${inApp ? 'アプリ内ブラウザ' : '通常'}`,
+    `接続: ${window.isSecureContext ? 'https OK' : 'https ではない'}  /  ブラウザ: ${inApp ? 'アプリ内ブラウザ' : (IS_BRAVE ? 'Brave' : '通常')}`,
     `センサー機能: 動き ${hasMotion ? 'あり' : 'なし'} / 向き ${hasOrient ? 'あり' : 'なし'} / 許可の確認 ${needPerm ? '必要' : '不要'}`,
     `許可の結果: ${tilt.permission || '未確認'}`,
     `動きセンサー: ${tilt.motionEvents || 0}回 受信（有効 ${tilt.motionValid || 0}）`,

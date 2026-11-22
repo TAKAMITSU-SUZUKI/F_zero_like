@@ -364,7 +364,9 @@ function onlineError(err) {
     timeout: 'つながりませんでした。同じWi-Fiにつなぐか、時間をおいて試してください'
   };
   onlineLeave(true);
-  setOnlineStatus(messages[type] || `接続エラー（${type || '不明'}）`, true);
+  const text = messages[type] || `接続エラー（${type || '不明'}）`;
+  // Brave はシールドがスマホ同士の直接通信を止めることがある
+  setOnlineStatus(IS_BRAVE && type !== 'peer-unavailable' ? `${text}。${BRAVE_SHIELD_HINT}` : text, true);
 }
 function onlineLeave(silent) {
   if (online.role === 'host') onlineBroadcast({ t: 'bye' });

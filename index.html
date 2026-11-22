@@ -23,12 +23,12 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=14">
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 <div id="wrap" class="selecting">
   <!-- 読み込みが終わり最初の画面が描けるまで覆っておく（途中の画面が見えないように） -->
-  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v14</div></div>
+  <div id="splash"><div class="splash-title">NEON RACER</div><div class="splash-sub">LOADING…</div><div class="splash-sub" style="animation:none;font-size:10px">2026-11-22 v15</div></div>
   <canvas id="gl"></canvas>
   <canvas id="c" width="800" height="450"></canvas>
   <div id="hud">
@@ -164,6 +164,30 @@
           </div>
         </div>
       </div>
+      <!-- オンライン対戦の部屋（ロビー） -->
+      <div class="tab-panel side" data-panel="online" hidden>
+        <div class="panel-title">ONLINE 対戦 <span class="sub">— 2〜4人</span></div>
+        <div class="online-status" id="onlineStatus">部屋を作るか、友だちの部屋に入ってください</div>
+        <div class="field" id="onlineNameField"><label>あなたの名前</label><input type="text" id="onlineName" maxlength="10" placeholder="PLAYER"></div>
+        <div class="online-machine">マシン: <b id="onlineMachine"></b> <button type="button" class="small-btn" id="onlineChangeMachine">変更</button></div>
+        <div id="onlineEntry">
+          <button type="button" class="small-btn primary online-wide" id="onlineCreate">🏠 部屋を作る（ホスト）</button>
+          <div class="share"><input id="onlineCode" placeholder="部屋コード（4文字）" maxlength="4" autocapitalize="characters"><button type="button" class="small-btn" id="onlineJoin">部屋に入る</button></div>
+          <div class="part-help">ホストのコース・周回数・CPUの数で走ります。電波の都合でつながらないときは、同じWi-Fiにつなぐと成功しやすくなります。</div>
+        </div>
+        <div id="onlineRoom" hidden>
+          <div class="room-code">部屋コード <b id="onlineRoomCode"></b></div>
+          <div class="online-invite">
+            <button type="button" class="small-btn" id="onlineLine">LINEで招待</button>
+            <button type="button" class="small-btn" id="onlineInvite">📨 リンクを送る</button>
+          </div>
+          <button type="button" class="small-btn primary online-wide" id="onlineStart">スタート ▶</button>
+          <button type="button" class="small-btn online-wide" id="onlineReady">準備OK</button>
+          <ul class="online-players" id="onlinePlayers"></ul>
+          <div class="tune-preview" id="onlineSettings"></div>
+          <button type="button" class="small-btn" id="onlineLeave">部屋を出る</button>
+        </div>
+      </div>
       <div class="tab-panel side" data-panel="options" hidden>
         <div class="panel-title">設定</div>
         <div class="audio-toggles">
@@ -188,18 +212,19 @@
       <div class="select-desc" id="machineDesc"></div>
     </div>
     <div class="select-hint">← → : 選ぶ / Enter : 次へ / Esc : 戻る / M : BGM / N : 効果音</div>
-    <div class="version-tag">2026-11-22 v14</div>
+    <div class="version-tag">2026-11-22 v15</div>
   </div>
 </div>
 
-<script src="js/core.js?v=14"></script>
-<script src="js/audio.js?v=14"></script>
-<script src="js/race-rules.js?v=14"></script>
-<script src="js/setup.js?v=14"></script>
-<script src="js/race.js?v=14"></script>
-<script src="js/render2d.js?v=14"></script>
-<script src="js/custom.js?v=14"></script>
-<script src="js/main.js?v=14"></script>
-<script src="js/render3d.js?v=14"></script>
+<script src="js/core.js?v=15"></script>
+<script src="js/audio.js?v=15"></script>
+<script src="js/race-rules.js?v=15"></script>
+<script src="js/setup.js?v=15"></script>
+<script src="js/race.js?v=15"></script>
+<script src="js/render2d.js?v=15"></script>
+<script src="js/custom.js?v=15"></script>
+<script src="js/online.js?v=15"></script>
+<script src="js/main.js?v=15"></script>
+<script src="js/render3d.js?v=15"></script>
 </body>
 </html>

@@ -1045,6 +1045,24 @@
   const rivalShips = racers.map((racer, i) =>
     makeShip(MACHINES[(i + 1) % MACHINES.length].id, new THREE.Color(racer.color).getHex(), false));
 
+  // オンライン対戦の相手のマシン（その人の機体・色・パーツで作り、頭上に名前を出す）
+  let remoteShips = [];
+  window.setRemoteShips = list => {
+    remoteShips.forEach(item => {
+      removeShip(item.ship);
+      scene.remove(item.label);
+      item.label.material.map.dispose();
+      item.label.material.dispose();
+    });
+    remoteShips = list.map(remote => {
+      const ship = makeShip(remote.machine.id, new THREE.Color(remote.machine.color).getHex(), false);
+      addPartVisuals(ship, remote.machine.parts || {});
+      const label = textSprite(remote.name, remote.machine.color);
+      label.scale.set(16, 6, 1);
+      return { pid: remote.pid, ship, label };
+    });
+  };
+
   // タイムアタックのゴースト（半透明の自己ベスト機）
   const ghostMat = new THREE.MeshBasicMaterial({
     color: 0x9be7ff, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending
@@ -1216,6 +1234,18 @@
       const laneVel = clamp((racer.targetLane - racer.lane) * 1.4, -0.35, 0.35);
       placeShip(ship, car.dist + gap, racer.lane * RIVAL_LANE_SCALE * LAT_SCALE, -laneVel * 0.6, -laneVel,
         3.2 + airHeightAt(racer.dist), now);
+    });
+
+    // オンライン対戦の相手
+    remoteShips.forEach(item => {
+      const r = online.remotes.get(item.pid);
+      const visible = Boolean(r) && !selectingMachine && raceMode === 'online' && r.status !== 'retired' && !r.falling
+        && r.d - car.dist > -BEHIND + 30 && r.d - car.dist < AHEAD;
+      item.ship.root.visible = item.ship.shadow.visible = item.label.visible = visible;
+      if (!visible) return;
+      const lat = r.x * PLAYER_LANE_SCALE * LAT_SCALE;
+      placeShip(item.ship, r.d, lat, -r.tilt * 0.14, -r.tilt * 0.28, 3.2 + airHeightAt(r.d), now);
+      at(tmpFrame, lat, 15, item.label.position);
     });
 
     frameAt(car.dist, camFrame);

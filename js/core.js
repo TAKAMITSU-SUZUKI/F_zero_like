@@ -356,7 +356,8 @@ const STAT_LABELS = { speed: 'SPEED', accel: 'ACCEL', grip: 'GRIP', boost: 'BOOS
 const MODES = [
   { id: 'gp', name: 'GRAND PRIX', desc: '全4コースを連戦し、順位ポイントの合計で総合優勝を目指す（最終戦は高難度コース）。' },
   { id: 'single', name: 'SINGLE RACE', desc: '好きなコースを選んで1レース。' },
-  { id: 'ta', name: 'TIME ATTACK', desc: 'ライバルなしの一人旅。自己ベストのゴーストと勝負。' }
+  { id: 'ta', name: 'TIME ATTACK', desc: 'ライバルなしの一人旅。自己ベストのゴーストと勝負。' },
+  { id: 'online', name: 'ONLINE 対戦', desc: '友だちと2〜4人で対戦。部屋を作って招待リンクを送るか、部屋コードで入る。' }
 ];
 let selectedMachine = 0;
 let selectedMode = 0;
@@ -601,7 +602,7 @@ function gridRacer(i) {
     boost: 40 + (i * 13) % 50,
     boostTimer: 0,
     energy: 100,
-    status: raceMode === 'ta' || i >= raceOptions.rivals ? 'absent' : 'racing',
+    status: raceMode === 'ta' || i >= (raceMode === 'online' ? online.rivals : raceOptions.rivals) ? 'absent' : 'racing',
     finishAt: null,
     color: RIVAL_COLORS[i % RIVAL_COLORS.length]
   };

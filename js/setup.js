@@ -121,7 +121,7 @@ function updateSetupUI() {
   document.getElementById('backBtn').textContent = onRace ? '◀ 戻る' : '◀ 選択に戻る';
   const startBtn = document.getElementById('startBtn');
   startBtn.hidden = !onRace;
-  startBtn.textContent = focusRow === 2 ? 'START ▶' : '次へ ▶';
+  startBtn.textContent = focusRow === 2 ? (currentMode() === 'online' ? '部屋へ ▶' : 'START ▶') : '次へ ▶';
   startBtn.classList.toggle('go', focusRow === 2);
   modePills.querySelectorAll('.mode-pill').forEach((pill, i) => pill.classList.toggle('active', i === selectedMode));
   const list = courseList();
@@ -161,6 +161,12 @@ function openSetup() {
   updateSetupUI();
 }
 function startFromSetup() {
+  // オンライン対戦は、すぐには走らず部屋（ロビー）の画面へ
+  if (currentMode() === 'online') {
+    setTab('online');
+    updateSetupUI();
+    return;
+  }
   // 傾き操作はボタンを押した操作の中でセンサーの許可を求める必要がある（iPhone）
   if (raceOptions.control === 'tilt') enableTilt();
   TOTAL_LAPS = raceOptions.laps;

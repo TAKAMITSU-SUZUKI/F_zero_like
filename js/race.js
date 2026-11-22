@@ -71,6 +71,11 @@ function updateSparks(dt) {
 // ===== ライバルAI =====
 function updateRacers(dt, now) {
   if (!raceStarted) return;
+  // オンライン対戦のゲスト: CPUライバルはホストが動かしているので、その位置を追いかけるだけ
+  if (onlineIsGuest()) {
+    onlineGuestRivals(dt, now);
+    return;
+  }
   const laneOptions = [-0.74, -0.5, -0.25, 0, 0.25, 0.5, 0.74];
   const playerLaneForRival = car.x * PLAYER_LANE_SCALE / RIVAL_LANE_SCALE;
   const pitZone = TRACK_ZONES.find(zone => zone.type === 'pit');
@@ -268,7 +273,10 @@ function checkRivalContact(now, m) {
     // 相手に大ダメージ＋大きく押し出し、自分は軽いダメージで済む。漫然と追突すると自分が損をする
     const attacking = Math.abs(gap) < 22 && (car.steerAxis * push > 0.3 || car.slide * push > 0.004);
     car.collisionCooldown = 40;
-    racer.energy -= (14 * force * (attacking ? 1.7 : 1)) / m.impact;
+    const loss = (14 * force * (attacking ? 1.7 : 1)) / m.impact;
+    // オンラインのゲストは、ライバルへのダメージをホストに判定してもらう
+    if (onlineIsGuest()) onlineSendRivalHit(racer, loss, push * (attacking ? 0.24 : 0.12));
+    else racer.energy -= loss;
     if (gap >= 0) {
       car.speed *= 1 - (attacking ? 0.08 : 0.22) * m.impact;
       racer.speed += attacking ? 0.4 : 1.5;
@@ -285,7 +293,7 @@ function checkRivalContact(now, m) {
     spawnSparks(W / 2 + push * 20, H - 83, attacking ? 12 : 7);
     breakCombo('接触');
     playCue(attacking ? 'attack' : 'contact');
-    if (racer.energy <= 0) {
+    if (racer.energy <= 0 && !onlineIsGuest()) {
       knockOut(racer);
     } else if (attacking) {
       car.attackCount++;
@@ -440,6 +448,18 @@ function drawMinimap(now) {
     ctx.arc(rx, ry, 2.1, 0, Math.PI * 2);
     ctx.fill();
   });
+  // オンライン対戦の相手（白い丸＋マシンの色の縁）
+  onlineRemoteList().forEach(r => {
+    if (r.status === 'retired') return;
+    const [rx, ry] = mapPoint(r.d);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = r.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
   if (ghostState.visible) {
     const [gx, gy] = mapPoint(ghostState.dist);
     ctx.fillStyle = 'rgba(186, 230, 253, 0.7)';
@@ -476,6 +496,11 @@ function drawProgressBar() {
     ctx.fillStyle = 'rgba(186, 230, 253, 0.8)';
     ctx.fillRect(toX(ghostState.dist) - 1, y - 6, 2, 12);
   }
+  onlineRemoteList().forEach(r => {
+    if (r.status === 'retired') return;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect((r.status === 'finished' ? x + w : toX(r.d)) - 1.5, y - 7, 3, 14);
+  });
   const px = car.status === 'finished' ? x + w : toX(car.dist);
   ctx.fillStyle = '#fde047';
   ctx.beginPath();
@@ -528,7 +553,11 @@ function drawWarnings(now) {
 // 名前・エネルギー残量を出し、残りが少ない相手は「K.O.」で体当たりのチャンスを知らせる
 function drawRivalRadar() {
   const playerLane = car.x * PLAYER_LANE_SCALE;
-  const near = racers
+  // オンライン対戦の相手も同じ形にして一緒に表示する
+  const humans = onlineRemoteList().filter(r => r.status === 'racing').map(r => ({
+    name: `👤${r.name}`, dist: r.d, lane: r.x * PLAYER_LANE_SCALE / RIVAL_LANE_SCALE, color: r.color, energy: r.energy, status: 'racing'
+  }));
+  const near = [...racers, ...humans]
     .filter(racer => racer.status === 'racing' && racer.dist - car.dist < 40 && racer.dist - car.dist > -220)
     .sort((a, b) => Math.abs(a.dist - car.dist) - Math.abs(b.dist - car.dist))
     .slice(0, 3);
@@ -804,6 +833,7 @@ function update(dt, now) {
   car.shake = Math.max(0, car.shake - 0.35 * dt);
   applyTrackZones(dt, now, m);
   checkRivalContact(now, m);
+  onlineCheckRemoteContact(now, m);
   if (drifting && Math.random() < 0.25 * dt) {
     spawnSparks(W / 2 + (Math.random() < 0.5 ? -40 : 40), H - 68, 1);
   }

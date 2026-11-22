@@ -478,6 +478,8 @@ function renderPauseButtons() {
   pauseOverlay.querySelector('[data-pause="se"]').textContent = `🔊 SE: ${audioSettings.se ? 'ON' : 'OFF'}`;
   pauseOverlay.querySelector('[data-pause="control"]').textContent = `操作: ${raceOptions.control === 'tilt' ? '傾き' : 'ボタン'}`;
   /** @type {HTMLElement} */ (pauseOverlay.querySelector('[data-pause="calibrate"]')).hidden = !(raceOptions.control === 'tilt' && tilt.active);
+  // オンライン対戦中は一人だけやり直せないので「リトライ」を隠す
+  /** @type {HTMLElement} */ (pauseOverlay.querySelector('[data-pause="retry"]')).hidden = raceMode === 'online';
 }
 function setPaused(on) {
   if (on === paused) return;
@@ -514,7 +516,12 @@ pauseOverlay.addEventListener('click', event => {
   if (!action) return;
   if (action === 'resume') setPaused(false);
   if (action === 'retry') { closePause(); beginRace(); }
-  if (action === 'menu') { closePause(); gp.active = false; openSetup(); }
+  if (action === 'menu') {
+    closePause();
+    gp.active = false;
+    if (raceMode === 'online' && online.role) onlineBackToLobby();   // オンラインは部屋の画面へ
+    else openSetup();
+  }
   if (action === 'bgm' || action === 'se') toggleAudio(action);
   if (action === 'control') {
     raceOptions.control = raceOptions.control === 'tilt' ? 'buttons' : 'tilt';
@@ -557,7 +564,7 @@ function toggleFullscreen() {
 document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
 document.getElementById('flipBtn').addEventListener('click', flipPortraitRotation);
 // ---- 傾きセンサーの診断（スマホの画面で、どこで止まっているかを確認できるようにする） ----
-const APP_VERSION = '2026-11-22 v14';
+const APP_VERSION = '2026-11-22 v15';
 let tiltDiagTimer = null;
 function renderTiltDiag() {
   const ua = navigator.userAgent;
@@ -938,6 +945,11 @@ function setTab(tab) {
     updateEditor({}, true);   // 作ったコースを背景にプレビュー
   }
   if (tab === 'options') renderOptions();
+  if (tab === 'online') {
+    renderOnlinePanel();
+    if (online.role === 'host') onlineBroadcastLobby();   // コースや機体を変えていたら皆に知らせる
+    if (online.role === 'guest') onlineSendHello();
+  }
 }
 /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#setupTabs button')).forEach(button => button.addEventListener('click', () => {
   setTab(button.dataset.tab);

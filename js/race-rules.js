@@ -39,10 +39,11 @@ function clamp(value, min, max) {
 
 function getRaceRank() {
   if (finalRank !== null) return finalRank;
-  return 1 + racers.filter(racer => racer.status === 'racing' && racer.dist > car.dist).length;
+  return 1 + racers.filter(racer => racer.status === 'racing' && racer.dist > car.dist).length
+    + onlineRemoteList().filter(r => r.status !== 'retired' && r.d > car.dist).length;
 }
 function fieldSize() {
-  return 1 + racers.filter(racer => racer.status !== 'absent').length;
+  return 1 + racers.filter(racer => racer.status !== 'absent').length + onlineRemoteList().length;
 }
 
 function formatTime(milliseconds) {
@@ -137,7 +138,8 @@ function updateRaceHud(now) {
   // 操作説明は最初のレースのカウントダウン中だけ（走り出したら消す）
   controlsHintEl.classList.toggle('hide', !(countdown.active && !hintSeen));
   raceHud.time.textContent = `TIME ${formatTime(raceElapsed(now))}`;
-  const modeName = raceMode === 'gp' ? `GP ${gp.index + 1}/${COURSES.length}` : (raceMode === 'ta' ? 'TIME ATTACK' : 'SINGLE RACE');
+  const modeName = raceMode === 'gp' ? `GP ${gp.index + 1}/${COURSES.length}`
+    : (raceMode === 'ta' ? 'TIME ATTACK' : (raceMode === 'online' ? `ONLINE ${onlineRemoteList().length + 1}P` : 'SINGLE RACE'));
   raceHud.rivals.textContent = `${modeName} · ${course.name}`;
 
   let gapHtml = '';
@@ -252,12 +254,17 @@ function finishRace(now) {
 // ===== リザルト =====
 function computeStandings() {
   const list = [{
-    name: 'YOU', isPlayer: true, finishAt: car.status === 'finished' ? finishAt : null,
+    name: raceMode === 'online' ? onlineName() : 'YOU', isPlayer: true, remote: false, finishAt: car.status === 'finished' ? finishAt : null,
     dist: car.dist, out: car.status === 'retired'
   }];
+  // オンライン対戦の相手（ゴールタイムはレース開始からの時間で届くので、自分の時計に直して比べる）
+  onlineRemoteList().forEach(r => list.push({
+    name: r.name, isPlayer: false, remote: true, finishAt: r.fin !== null ? raceStartedAt + r.fin : null,
+    dist: r.d, out: r.status === 'retired'
+  }));
   racers.forEach(racer => {
     if (racer.status === 'absent') return;
-    list.push({ name: racer.name, isPlayer: false, finishAt: racer.finishAt, dist: racer.dist, out: racer.status === 'out' });
+    list.push({ name: racer.name, isPlayer: false, remote: false, finishAt: racer.finishAt, dist: racer.dist, out: racer.status === 'out' });
   });
   list.sort((a, b) => {
     if (a.out !== b.out) return a.out ? 1 : -1;
@@ -280,7 +287,7 @@ function taTargets() {
     { name: 'BRONZE', time: timeAt(13.0), points: 60 }
   ];
 }
-function awardPoints(playerPos, fieldCount, retired, gpFinalRank) {
+function awardPoints(playerPos, fieldCount, retired, gpFinalRank, standings = []) {
   /** @type {Array<[string, number]>} */
   const items = [];
   const lapFactor = TOTAL_LAPS / 3;   // 周回数が多いほど多くもらえる
@@ -299,6 +306,9 @@ function awardPoints(playerPos, fieldCount, retired, gpFinalRank) {
     }
     if (koCount) items.push([`K.O. ×${koCount}`, koCount * 25]);
     if (car.attackCount) items.push([`体当たり ×${car.attackCount}`, Math.min(60, car.attackCount * 5)]);
+    // オンライン: 自分より後ろでゴールした（またはリタイアした）友だちの数だけボーナス
+    const beaten = retired ? 0 : standings.slice(playerPos).filter(entry => entry.remote).length;
+    if (beaten) items.push([`対戦相手に勝利 ×${beaten}`, beaten * 80]);
   }
   if (car.maxCombo >= 5) items.push([`ドリドリ最大 ×${car.maxCombo}`, Math.min(80, car.maxCombo * 4)]);
   if (gpFinalRank) items.push([`GP総合 ${gpFinalRank}位`, [500, 300, 200][gpFinalRank - 1] || 80]);
@@ -324,6 +334,16 @@ function showResults() {
   let gpFinalRank = null;
   let buttons = `<button class="primary" type="button" data-act="retry">もう一度走る</button>
     <button type="button" data-act="menu">メニューへ</button>`;
+  if (raceMode === 'online') {
+    // オンライン: 全体の順位表（人間は全員、CPUは上位だけ）
+    const rows = standings.map((entry, i) => ({ ...entry, rank: i + 1 }))
+      .filter(row => row.rank <= 6 || row.remote || row.isPlayer)
+      .map(row => `<tr class="${row.isPlayer ? 'me' : (row.remote ? 'human' : '')}"><td>${row.rank}</td><td>${escapeHtml(row.name)}${row.remote ? ' 👤' : ''}</td>
+        <td>${row.out ? 'RETIRE' : (row.finishAt ? formatTime(row.finishAt - raceStartedAt) : '走行中')}</td></tr>`).join('');
+    gpHtml = `<div class="gp-title">ONLINE 対戦結果</div>
+      <table class="gp-table"><tr><th>#</th><th>NAME</th><th>タイム</th></tr>${rows}</table>`;
+    buttons = '<button class="primary" type="button" data-act="lobby">ロビーに戻る</button>';
+  }
   if (raceMode === 'gp') {
     const racePoints = {};
     standings.forEach((entry, i) => {
@@ -357,7 +377,7 @@ function showResults() {
   if (!retired && lastResult.newLap) badges.push('NEW LAP RECORD!');
   const lapRows = lapTimes.map((time, i) =>
     `<li class="${time === bestLap ? 'best' : ''}">LAP ${i + 1}<span>${formatTime(time)}</span></li>`).join('');
-  const award = awardPoints(playerPos, standings.length, retired, gpFinalRank);
+  const award = awardPoints(playerPos, standings.length, retired, gpFinalRank, standings);
   const pointsHtml = `<div class="points-earned"><span class="total">+0 PT</span> 獲得（所持 ${progress.points} PT）
     <ul>${award.items.map(([label, pts]) => `<li>${label} +${pts}</li>`).join('')}</ul>
     ${canBuyPart() ? '<div class="hint">▶ メニューの「🔧 パーツ・色」で新しいパーツを買えます</div>' : ''}</div>`;
@@ -405,6 +425,17 @@ function resultAction(action) {
     gp.active = false;
     openSetup();
   }
+  if (action === 'lobby') onlineBackToLobby();
+}
+// オンライン対戦のロビー（部屋の画面）へ戻る。ホストがスタートすると全員が次のレースへ
+function onlineBackToLobby() {
+  online.inRace = false;
+  openSetup();
+  selectedMode = MODES.findIndex(mode => mode.id === 'online');
+  focusRow = 2;
+  setTab('online');
+  updateSetupUI();
+  if (online.role === 'host') onlineBroadcastLobby();
 }
 
 function resetRace() {
@@ -432,9 +463,10 @@ function resetRace() {
   releaseAllInputs();
   updateRaceHud(raceStartedAt);
 }
-function beginRace() {
-  // レースごとに音声エンジンを作り直し、前のレースで溜まった処理を捨てる（音飛び・遅れ対策）
-  if (A.context) resetAudioEngine();
+function beginRace(keepAudio) {
+  // レースごとに音声エンジンを作り直し、前のレースで溜まった処理を捨てる（音飛び・遅れ対策）。
+  // オンライン対戦のゲストは通信でスタートする（タップ操作ではない）ので作り直さない
+  if (A.context && !keepAudio) resetAudioEngine();
   else startAudio();
   resetRace();
   startCountdown(performance.now());

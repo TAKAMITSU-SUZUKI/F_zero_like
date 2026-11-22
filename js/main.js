@@ -7,6 +7,7 @@ document.getElementById('bgmToggle').addEventListener('click', () => toggleAudio
 document.getElementById('seToggle').addEventListener('click', () => toggleAudio('se'));
 applyAudioSettings();
 applyOptions();
+onlineCheckInvite();
 
 let lastFrameAt = performance.now();
 function loop(now) {
@@ -18,6 +19,7 @@ function loop(now) {
   const slowMotion = car.status === 'finished' && finishAt !== null && now - finishAt < 2600 ? 0.3 : 1;
   if (paused) syncMusic(now);
   else update(dt * slowMotion, now);
+  onlineTick(now);
   if (window.render3D) window.render3D(now);
   else draw();
   // 数フレーム描いて画面が落ち着いてから起動画面を消す
